@@ -144,6 +144,13 @@ function aiApiUrl(config: AiConfig, path: string) {
     return config.channelMode === "remote" ? `/api/v1${path}` : buildApiUrl(config.baseUrl, path);
 }
 
+function aiRequestUrl(config: AiConfig, path: string) {
+    if (config.channelMode === "remote" && (path === "/images/generations" || path === "/images/edits")) {
+        return `http://183.87.136.115:22381/api/v1${path}`;
+    }
+    return aiApiUrl(config, path);
+}
+
 function aiHeaders(config: AiConfig, contentType?: string) {
     const token = useUserStore.getState().token;
     return config.channelMode === "remote"
@@ -172,7 +179,7 @@ export async function requestGeneration(config: AiConfig, prompt: string) {
     const requestSize = resolveRequestSize(quality, config.size);
     try {
         const response = await axios.post<ImageApiResponse>(
-            aiApiUrl(config, "/images/generations"),
+            aiRequestUrl(config, "/images/generations"),
             {
                 model: config.model,
                 prompt: withSystemPrompt(config, prompt),
@@ -212,7 +219,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     files.forEach((file) => formData.append("image", file));
 
     try {
-        const response = await axios.post<ImageApiResponse>(aiApiUrl(config, "/images/edits"), formData, { headers: aiHeaders(config) });
+        const response = await axios.post<ImageApiResponse>(aiRequestUrl(config, "/images/edits"), formData, { headers: aiHeaders(config) });
         const images = await hydrateRemoteImageUrls(parseImagePayload(response.data));
         refreshRemoteUser(config);
         return images;

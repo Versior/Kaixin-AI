@@ -9,6 +9,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -16,11 +17,27 @@ import (
 	"github.com/basketikun/infinite-canvas/service"
 )
 
+
+func withPublicAPICORS(w http.ResponseWriter, r *http.Request) bool {
+	w.Header().Set(Access-Control-Allow-Origin, *)	w.Header().Set(Access-Control-Allow-Headers, Authorization, Content-Type)	w.Header().Set(Access-Control-Allow-Methods, GET, POST, PUT, PATCH, DELETE, OPTIONS)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return true
+	}
+	return false
+}
+
 func AIImagesGenerations(w http.ResponseWriter, r *http.Request) {
+	if withPublicAPICORS(w, r) {
+		return
+	}
 	proxyAIRequest(w, r, "/images/generations")
 }
 
 func AIImagesEdits(w http.ResponseWriter, r *http.Request) {
+	if withPublicAPICORS(w, r) {
+		return
+	}
 	proxyAIRequest(w, r, "/images/edits")
 }
 
@@ -157,6 +174,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		Fail(w, "AI 接口请求失败："+readErr.Error())
 		return
 	}
+	payload = rewritePublicImageURLs(payload)
 	if onDone != nil {
 		onDone("success", payload, "")
 	}
@@ -371,4 +389,42 @@ type aiError struct {
 
 func (err *aiError) Error() string {
 	return err.message
+}
+
+func rewritePublicImageURLs(payload []byte) []byte {
+	base := strings.TrimRight(os.Getenv("PUBLIC_IMAGE_BASE_URL"), "/")
+	if base == "" || len(payload) == 0 {
+		return payload
+	}
+	var parsed map[string]any
+	if json.Unmarshal(payload, &parsed) != nil {
+		return payload
+	}
+	data, ok := parsed["data"].([]any)
+	if !ok {
+		return payload
+	}
+	changed := false
+	for _, item := range data {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		urlValue, ok := obj["url"].(string)
+		if !ok || urlValue == "" {
+			continue
+		}
+		if strings.HasPrefix(urlValue, "http://172.17.0.1:3000") {
+			obj["url"] = base + strings.TrimPrefix(urlValue, "http://172.17.0.1:3000")
+			changed = true
+		}
+	}
+	if !changed {
+		return payload
+	}
+	updated, err := json.Marshal(parsed)
+	if err != nil {
+		return payload
+	}
+	return updated
 }
