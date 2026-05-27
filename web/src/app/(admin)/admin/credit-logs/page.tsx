@@ -41,7 +41,7 @@ export default function AdminCreditLogsPage() {
             title: "用户名",
             dataIndex: "userId",
             width: 220,
-            render: (_, item) => <Typography.Text copyable>{item.username || -}</Typography.Text>,
+            render: (_, item) => <Typography.Text copyable>{item.username || "-"}</Typography.Text>,
         },
         {
             title: "类型",

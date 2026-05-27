@@ -36,7 +36,7 @@ export function useAdminGenerationLogs() {
     const usersById = new Map((usersQuery.data?.items || []).map((user: AdminUser) => [user.id, user]));
     const logs: AdminGenerationLog[] = (query.data?.items || []).map((log) => {
         const user = usersById.get(log.userId);
-        return { ...log, username: user?.displayName || user?.username || log.username || - };
+        return { ...log, username: user?.displayName || user?.username || log.username || "-" };
     });
 
     const deleteMutation = useMutation({
