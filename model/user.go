@@ -88,7 +88,7 @@ const (
 type CreditLog struct {
 	ID        string        `json:"id" gorm:"primaryKey"`
 	UserID    string        `json:"userId" gorm:"index"`
-	Username  string        `json:"username" gorm:"-"`
+	Username  string        `json:"username" gorm:"->;column:username"`
 	Type      CreditLogType `json:"type"`
 	Amount    int           `json:"amount"`
 	Balance   int           `json:"balance"`
@@ -113,7 +113,7 @@ const (
 type GenerationLog struct {
 	ID        string            `json:"id" gorm:"primaryKey"`
 	UserID    string            `json:"userId" gorm:"index"`
-	Username  string            `json:"username" gorm:"-"`
+	Username  string            `json:"username" gorm:"->;column:username"`
 	Kind      GenerationLogKind `json:"kind" gorm:"index"`
 	Model     string            `json:"model" gorm:"index"`
 	Path      string            `json:"path"`

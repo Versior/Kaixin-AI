@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/versior/kaixin-ai:v0.1.0-kaixin.2
+    image: ghcr.io/versior/kaixin-ai:v0.1.0-kaixin.4
     container_name: infinite-canvas
     env_file:
       - .env
