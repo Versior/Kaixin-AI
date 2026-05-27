@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 
@@ -81,6 +82,10 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 	if setting.Auth.AllowRegister == nil {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
+	}
+	setting.ImageAPIBaseURL = strings.TrimRight(strings.TrimSpace(setting.ImageAPIBaseURL), "/")
+	if setting.ImageAPIBaseURL == "" {
+		setting.ImageAPIBaseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_IMAGE_API_BASE_URL")), "/")
 	}
 	return setting
 }

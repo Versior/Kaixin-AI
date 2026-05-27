@@ -146,7 +146,8 @@ function aiApiUrl(config: AiConfig, path: string) {
 
 function aiRequestUrl(config: AiConfig, path: string) {
     if (config.channelMode === "remote" && (path === "/images/generations" || path === "/images/edits")) {
-        return `http://183.87.136.115:22381/api/v1${path}`;
+        const baseUrl = config.imageApiBaseUrl.trim().replace(/\/+$/, "");
+        if (baseUrl) return `${baseUrl.endsWith("/api/v1") ? baseUrl : `${baseUrl}/api/v1`}${path}`;
     }
     return aiApiUrl(config, path);
 }

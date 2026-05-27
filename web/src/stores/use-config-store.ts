@@ -22,6 +22,7 @@ export type AiConfig = {
     quality: string;
     size: string;
     count: string;
+    imageApiBaseUrl: string;
 };
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
@@ -41,6 +42,7 @@ export const defaultConfig: AiConfig = {
     quality: "auto",
     size: "1:1",
     count: "1",
+    imageApiBaseUrl: "",
 };
 
 type ConfigStore = {
@@ -57,7 +59,8 @@ type ConfigStore = {
     clearPromptContinue: () => void;
 };
 
-function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null) {
+function resolveEffectiveConfig(config: AiConfig, publicSettings: AdminPublicSettings | null) {
+    const modelChannel = publicSettings?.modelChannel || null;
     const channelMode = modelChannel?.allowCustomChannel ? config.channelMode : "remote";
     if (channelMode === "local" || !modelChannel) return { ...config, channelMode };
     const models = modelChannel.availableModels;
@@ -71,6 +74,7 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
         videoModel: models.includes(config.videoModel) ? config.videoModel : modelChannel.defaultVideoModel || fallbackModel,
         textModel: models.includes(config.textModel) ? config.textModel : modelChannel.defaultTextModel || fallbackModel,
         systemPrompt: modelChannel.systemPrompt,
+        imageApiBaseUrl: publicSettings?.imageApiBaseUrl || "",
     };
 }
 
@@ -120,8 +124,8 @@ export const useConfigStore = create<ConfigStore>()(
 
 export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
-    const modelChannel = useConfigStore((state) => state.publicSettings?.modelChannel || null);
-    return useMemo(() => resolveEffectiveConfig(config, modelChannel), [config, modelChannel]);
+    const publicSettings = useConfigStore((state) => state.publicSettings);
+    return useMemo(() => resolveEffectiveConfig(config, publicSettings), [config, publicSettings]);
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {

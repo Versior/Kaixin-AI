@@ -41,8 +41,9 @@ type PublicModelChannelSetting struct {
 
 // PublicSetting 公开配置。
 type PublicSetting struct {
-	ModelChannel PublicModelChannelSetting `json:"modelChannel"`
-	Auth         PublicAuthSetting         `json:"auth"`
+	ModelChannel   PublicModelChannelSetting `json:"modelChannel"`
+	Auth           PublicAuthSetting         `json:"auth"`
+	ImageAPIBaseURL string                    `json:"imageApiBaseUrl"`
 }
 
 type PublicAuthSetting struct {

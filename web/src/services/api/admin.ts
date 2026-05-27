@@ -219,6 +219,7 @@ export type AdminModelCost = {
 
 export type AdminPublicSettings = {
     modelChannel: AdminPublicModelChannelSettings;
+    imageApiBaseUrl: string;
     auth: {
         allowRegister: boolean;
         linuxDo: {
