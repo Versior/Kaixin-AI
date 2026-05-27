@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ghcr.io/versior/infinite-canvas:vv0.1.0-kaixin.1
+    container_name: infinite-canvas
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "22380:3000"
+    restart: unless-stopped

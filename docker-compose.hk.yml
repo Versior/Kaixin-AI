@@ -1,0 +1,11 @@
+services:
+  app:
+    image: infinite-canvas:patched-20260526
+    container_name: infinite-canvas
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "22380:3000"
+    restart: unless-stopped
