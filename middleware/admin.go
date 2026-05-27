@@ -22,6 +22,13 @@ func AdminAuth(c *gin.Context) {
 }
 
 func UserAuth(c *gin.Context) {
+	if c.Request.Method == http.MethodOptions {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	}
 	user, ok := authUser(c)
 	if !ok || user.Role == model.UserRoleGuest {
 		handler.Fail(c.Writer, "未登录或权限不足")
