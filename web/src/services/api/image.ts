@@ -230,7 +230,7 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
         const response = await axios.post(
             aiApiUrl(config, "/chat/completions"),
             {
-                model: config.model,
+                model: config.textModel || config.model,
                 messages: withSystemMessage(config, messages),
                 stream: true,
             },

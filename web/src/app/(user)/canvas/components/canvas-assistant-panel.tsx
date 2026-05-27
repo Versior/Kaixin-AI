@@ -21,7 +21,12 @@ import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
 import { CanvasPromptLibrary } from "./canvas-prompt-library";
 import { CanvasNodeType, type CanvasAssistantImage, type CanvasAssistantMessage, type CanvasAssistantReference, type CanvasAssistantSession, type CanvasNodeData } from "../types";
 
-type AssistantMode = "ask" | "image";
+type AssistantMode = "ask";
+
+function isTextModel(model: string) {
+    const name = model.toLowerCase();
+    return !name.includes("image") && !name.includes("imagine") && !name.includes("video") && !name.includes("dall") && !name.includes("flux") && !name.includes("stable-diffusion");
+}
 const PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = PANEL_MOTION_MS / 1000;
 
@@ -49,7 +54,6 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const [width, setWidth] = useState(390);
     const [view, setView] = useState<"chat" | "history">("chat");
-    const [mode, setMode] = useState<AssistantMode>("ask");
     const [prompt, setPrompt] = useState("");
     const [isRunning, setIsRunning] = useState(false);
     const [checkedChatIds, setCheckedChatIds] = useState<string[]>([]);
@@ -79,6 +83,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     const allSelectedReferences = useMemo(() => buildAssistantReferences(nodes, selectedNodeIds), [nodes, selectedNodeIds]);
     const selectedReferences = useMemo(() => allSelectedReferences.filter((item) => !removedReferenceIds.has(item.id)), [allSelectedReferences, removedReferenceIds]);
     const iconButtonStyle = { color: theme.node.muted };
+    const textModels = useMemo(() => effectiveConfig.models.filter(isTextModel), [effectiveConfig.models]);
+    const textModel = effectiveConfig.textModel && isTextModel(effectiveConfig.textModel) ? effectiveConfig.textModel : textModels[0] || effectiveConfig.textModel || effectiveConfig.model;
 
     useEffect(() => {
         setRemovedReferenceIds(new Set());
@@ -138,7 +144,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     };
 
     const sendMessage = async (text: string, nextMode: AssistantMode, history: CanvasAssistantMessage[], savedReferences?: CanvasAssistantReference[]) => {
-        const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
+        const requestConfig = { ...effectiveConfig, model: textModel, textModel };
         if (!isAiConfigReady(requestConfig, requestConfig.model)) {
             openConfigDialog(true);
             return;
@@ -151,7 +157,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
         }
 
         const refs = savedReferences || selectedReferences;
-        const userMessage: CanvasAssistantMessage = { id: nanoid(), role: "user", mode: nextMode, text, references: refs };
+        const userMessage: CanvasAssistantMessage = { id: nanoid(), role: "user", mode: "ask", text, references: refs };
         const assistantId = nanoid();
         appendMessage(session.id, userMessage);
         appendMessage(session.id, { id: assistantId, role: "assistant", mode: "ask", text: "正在回答", isLoading: true });
@@ -173,7 +179,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     const submit = async () => {
         const text = prompt.trim();
         if (!text || isRunning) return;
-        await sendMessage(text, mode, messages);
+        await sendMessage(text, "ask", messages);
     };
 
     const retryMessage = (message: CanvasAssistantMessage) => {
@@ -299,12 +305,12 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
 
                 {view === "chat" ? (
                     <AssistantComposer
-                        mode={mode}
+                        mode="ask"
                         prompt={prompt}
                         isRunning={isRunning}
                         references={selectedReferences}
-                        config={effectiveConfig}
-                        onModeChange={setMode}
+                        config={{ ...effectiveConfig, textModel, model: textModel }}
+                        textModels={textModels}
                         onPromptChange={setPrompt}
                         onSubmit={submit}
                         onConfigChange={updateConfig}
@@ -352,7 +358,6 @@ function AssistantComposer({
     isRunning,
     references,
     config,
-    onModeChange,
     onPromptChange,
     onSubmit,
     onConfigChange,
@@ -360,13 +365,13 @@ function AssistantComposer({
     onRemoveReference,
     onPasteImage,
     modelCosts,
+    textModels,
 }: {
     mode: AssistantMode;
     prompt: string;
     isRunning: boolean;
     references: CanvasAssistantReference[];
     config: AiConfig;
-    onModeChange: (mode: AssistantMode) => void;
     onPromptChange: (prompt: string) => void;
     onSubmit: () => void;
     onConfigChange: (key: keyof AiConfig, value: string) => void;
@@ -374,6 +379,7 @@ function AssistantComposer({
     onRemoveReference: (id: string) => void;
     onPasteImage: (file: File) => void;
     modelCosts?: { model: string; credits: number }[];
+    textModels: string[];
 }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const activeModel = config.textModel || config.model;
@@ -410,7 +416,7 @@ function AssistantComposer({
                 <div className="mt-2 flex items-center justify-between gap-2">
                     <div className="canvas-composer-tools flex min-w-0 flex-1 items-center gap-1">
                         <CanvasPromptLibrary onSelect={onPromptChange} />
-                        <ModelPicker className="h-8 shrink-0" config={config} value={config.textModel || config.model} onChange={(model) => onConfigChange("textModel", model)} onMissingConfig={onMissingConfig} />
+                        <ModelPicker className="h-8 shrink-0" config={config} value={config.textModel || config.model} models={textModels.length ? textModels : [config.textModel || config.model].filter(Boolean)} onChange={(model) => onConfigChange("textModel", model)} onMissingConfig={onMissingConfig} />
                     </div>
                     <Button
                         type="primary"
@@ -431,42 +437,6 @@ function AssistantComposer({
             </div>
         </div>
     );
-}
-
-function AssistantModeSwitch({ mode, theme, onChange }: { mode: AssistantMode; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (mode: AssistantMode) => void }) {
-    return (
-        <div className="canvas-composer-mode-switch flex h-8 shrink-0 items-center rounded-full p-0.5" style={{ background: theme.node.fill }}>
-            {[
-                { value: "ask" as const, title: "对话", icon: <MessageSquare className="size-4" /> },
-                { value: "image" as const, title: "生图", icon: <ImageIcon className="size-4" /> },
-            ].map((item) => (
-                <Tooltip key={item.value} title={item.title}>
-                    <button
-                        type="button"
-                        className="canvas-composer-mode-button flex h-7 cursor-pointer items-center justify-center gap-1 rounded-full border-0 bg-transparent transition"
-                        style={{ background: mode === item.value ? theme.node.activeStroke : "transparent", color: mode === item.value ? theme.node.panel : theme.node.text }}
-                        onClick={() => onChange(item.value)}
-                        aria-label={item.title}
-                    >
-                        {item.icon}
-                        <span>{item.title}</span>
-                    </button>
-                </Tooltip>
-            ))}
-        </div>
-    );
-}
-
-function SettingTitle({ children, color }: { children: string; color: string }) {
-    return (
-        <div className="text-xs font-medium" style={{ color }}>
-            {children}
-        </div>
-    );
-}
-
-function qualityLabel(value: string) {
-    return ({ auto: "自动", high: "高", medium: "中", low: "低" } as Record<string, string>)[value] || value;
 }
 
 function AssistantMessages({

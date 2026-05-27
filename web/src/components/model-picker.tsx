@@ -15,12 +15,14 @@ type ModelPickerProps = {
     fullWidth?: boolean;
     placeholder?: string;
     onMissingConfig?: () => void;
+    models?: string[];
 };
 
-export function ModelPicker({ config, value, onChange, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, className, fullWidth = false, placeholder = "选择模型", onMissingConfig, models }: ModelPickerProps) {
     const pickerId = useId();
     const [open, setOpen] = useState(false);
-    const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" ? [value] : []), ...config.models].filter(Boolean))), [config.channelMode, config.models, value]);
+    const sourceModels = models || config.models;
+    const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" ? [value] : []), ...sourceModels].filter(Boolean))), [config.channelMode, sourceModels, value]);
     const current = value || "";
 
     useEffect(() => {
