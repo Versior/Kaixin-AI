@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { deleteAdminGenerationLog, fetchAdminGenerationLogs, fetchAdminUsers, type AdminGenerationLog, type AdminUser } from "@/services/api/admin";
+import { deleteAdminGenerationLog, deleteAdminGenerationLogs, fetchAdminGenerationLogs, fetchAdminUsers, type AdminGenerationLog, type AdminUser } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const defaultPageSize = 8;
@@ -48,6 +48,15 @@ export function useAdminGenerationLogs() {
         onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
     });
 
+    const deletePageMutation = useMutation({
+        mutationFn: (ids: string[]) => deleteAdminGenerationLogs(token, ids),
+        onSuccess: async (_, ids) => {
+            await queryClient.invalidateQueries({ queryKey: ["admin", "generation-logs"] });
+            message.success(`已删除 ${ids.length} 条记录`);
+        },
+        onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
+    });
+
     useEffect(() => {
         if (query.isError) {
             const errorMessage = query.error instanceof Error ? query.error.message : "读取生成记录失败";
@@ -67,7 +76,7 @@ export function useAdminGenerationLogs() {
 
     return {
         logs, keyword, kind: type, page, pageSize, total: query.data?.total || 0,
-        isLoading: query.isFetching || usersQuery.isFetching || deleteMutation.isPending,
-        searchLogs: (value = keyword) => updateFilters({ keyword: value }), changeKind: (value: string) => updateFilters({ type: value }), changePage: (value: number) => updateFilters({ page: value }), changePageSize: (value: number) => updateFilters({ pageSize: value }), resetFilters: () => updateFilters({ keyword: "", type: "", page: 1, pageSize: defaultPageSize }), refreshLogs: () => query.refetch(), deleteLog: (id: string) => deleteMutation.mutateAsync(id),
+        isLoading: query.isFetching || usersQuery.isFetching || deleteMutation.isPending || deletePageMutation.isPending,
+        searchLogs: (value = keyword) => updateFilters({ keyword: value }), changeKind: (value: string) => updateFilters({ type: value }), changePage: (value: number) => updateFilters({ page: value }), changePageSize: (value: number) => updateFilters({ pageSize: value }), resetFilters: () => updateFilters({ keyword: "", type: "", page: 1, pageSize: defaultPageSize }), refreshLogs: () => query.refetch(), deleteLog: (id: string) => deleteMutation.mutateAsync(id), deletePageLogs: (ids: string[]) => deletePageMutation.mutateAsync(ids),
     };
 }

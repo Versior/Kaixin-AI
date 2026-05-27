@@ -20,7 +20,7 @@ func ListGenerationLogs(q model.Query) ([]model.GenerationLog, int64, error) {
 		return nil, 0, err
 	}
 	q.Normalize()
-	tx := db.Model(&model.GenerationLog{}).Select("generation_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, generation_logs.user_id) AS username").Joins("LEFT JOIN users ON users.id = generation_logs.user_id")
+	tx := db.Model(&model.GenerationLog{}).Select("generation_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '-') AS username").Joins("LEFT JOIN users ON users.id = generation_logs.user_id")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
 		tx = tx.Where("generation_logs.user_id LIKE ? OR users.username LIKE ? OR users.display_name LIKE ? OR kind LIKE ? OR model LIKE ? OR path LIKE ? OR prompt LIKE ? OR status LIKE ? OR error LIKE ?", like, like, like, like, like, like, like, like, like)
@@ -43,4 +43,16 @@ func DeleteGenerationLog(id string) error {
 		return err
 	}
 	return db.Delete(&model.GenerationLog{}, "id = ?", id).Error
+}
+
+
+func DeleteGenerationLogs(ids []string) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return db.Delete(&model.GenerationLog{}, "id IN ?", ids).Error
 }

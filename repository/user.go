@@ -145,7 +145,7 @@ func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 		return nil, 0, err
 	}
 	q.Normalize()
-	tx := db.Model(&model.CreditLog{}).Select("credit_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '') AS username").Joins("LEFT JOIN users ON users.id = credit_logs.user_id")
+	tx := db.Model(&model.CreditLog{}).Select("credit_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '-') AS username").Joins("LEFT JOIN users ON users.id = credit_logs.user_id")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
 		tx = tx.Where("credit_logs.user_id LIKE ? OR users.username LIKE ? OR users.display_name LIKE ? OR type LIKE ? OR remark LIKE ? OR related_id LIKE ?", like, like, like, like, like, like)

@@ -89,3 +89,13 @@ func AdminDeleteGenerationLog(w http.ResponseWriter, r *http.Request, id string)
 	}
 	OK(w, true)
 }
+
+func AdminDeleteGenerationLogs(w http.ResponseWriter, r *http.Request) {
+	var request adminBatchDeleteRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.DeleteGenerationLogs(request.IDs); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}

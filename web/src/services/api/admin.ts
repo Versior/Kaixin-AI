@@ -102,6 +102,10 @@ export async function deleteAdminGenerationLog(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/generation-logs/${encodeURIComponent(id)}`, token);
 }
 
+export async function deleteAdminGenerationLogs(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/generation-logs/batch-delete", { ids }, token);
+}
+
 export async function fetchAdminCreditLogs(token: string, query: AdminUserQuery = {}) {
     return apiGet<AdminCreditLogListResponse>("/api/admin/credit-logs", compactApiParams(query), token);
 }

@@ -47,6 +47,8 @@ func SaveGenerationLog(item model.GenerationLog) (model.GenerationLog, error) {
 
 func DeleteGenerationLog(id string) error { return repository.DeleteGenerationLog(id) }
 
+func DeleteGenerationLogs(ids []string) error { return repository.DeleteGenerationLogs(ids) }
+
 func BuildGenerationLog(userID string, path string, modelName string, requestBody []byte, responseBody []byte, status string, errMessage string) model.GenerationLog {
 	kind := model.GenerationLogKindChat
 	if strings.Contains(path, "/images/") {
