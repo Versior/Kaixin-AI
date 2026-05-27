@@ -99,6 +99,9 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	}
 	if isImageAIPath(path) {
 		if !allowImageSubmission(user.ID) {
+			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, []byte(`{"msg":"图片生成太频繁，请 3 分钟内最多提交 2 次"}`), "rate_limited", "图片生成太频繁，请 3 分钟内最多提交 2 次")); err != nil {
+				log.Printf("AI proxy save rate limit generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
+			}
 			Fail(w, "图片生成太频繁，请 3 分钟内最多提交 2 次")
 			return
 		}
@@ -247,7 +250,8 @@ func allowImageSubmission(userID string) bool {
 			kept = append(kept, item)
 		}
 	}
-	if len(kept) >= 2 {
+	const maxImageSubmissionsPerWindow = 20
+	if len(kept) >= maxImageSubmissionsPerWindow {
 		imageSubmissionLimiter.items[userID] = kept
 		return false
 	}
