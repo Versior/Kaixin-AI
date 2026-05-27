@@ -29,7 +29,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
     const { path } = await context.params;
     const apiBaseUrl = process.env.API_BASE_URL || "http://127.0.0.1:8080";
     const target = `${apiBaseUrl.replace(/\/$/, "")}/api/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;
-    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    const hasBody = request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS";
 
     try {
         const response = await fetch(target, {
