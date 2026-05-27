@@ -22,6 +22,9 @@ export function formatDuration(ms: number) {
 }
 
 export function getDataUrlByteSize(dataUrl: string) {
+    if (!dataUrl.startsWith("data:")) {
+        return 0;
+    }
     const base64 = dataUrl.split(",", 2)[1];
     if (!base64) {
         return 0;
@@ -42,7 +45,15 @@ export function readFileAsDataUrl(file: File) {
 export function readImageMeta(dataUrl: string) {
     return new Promise<{ width: number; height: number; mimeType: string }>((resolve) => {
         const image = new Image();
-        const done = () => resolve({ width: image.naturalWidth || 1024, height: image.naturalHeight || 1024, mimeType: dataUrl.match(/^data:([^;]+)/)?.[1] || "image/png" });
+        let doneCalled = false;
+        const done = () => {
+            if (doneCalled) return;
+            doneCalled = true;
+            resolve({ width: image.naturalWidth || 1024, height: image.naturalHeight || 1024, mimeType: dataUrl.match(/^data:([^;]+)/)?.[1] || "image/png" });
+        };
+        if (/^https?:\/\//i.test(dataUrl)) {
+            image.crossOrigin = "anonymous";
+        }
         image.onload = done;
         image.onerror = done;
         setTimeout(done, 3000);

@@ -80,18 +80,6 @@ function resolveImageDataUrl(item: Record<string, unknown>) {
     return null;
 }
 
-async function remoteImageToDataUrl(url: string) {
-    const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`);
-    if (!response.ok) throw new Error(`图片下载失败：${response.status}`);
-    const blob = await response.blob();
-    return await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("图片读取失败"));
-        reader.readAsDataURL(blob);
-    });
-}
-
 function parseImagePayload(payload: ImageApiResponse) {
     if (typeof payload.code === "number" && payload.code !== 0) {
         throw new Error(payload.msg || "请求失败");
@@ -110,7 +98,10 @@ function parseImagePayload(payload: ImageApiResponse) {
 }
 
 async function hydrateRemoteImageUrls(images: Array<{ id: string; dataUrl: string }>) {
-    return Promise.all(images.map(async (image) => ({ ...image, dataUrl: image.dataUrl.startsWith("http") ? await remoteImageToDataUrl(image.dataUrl) : image.dataUrl })));
+    // Keep upstream image URLs as URLs. Fetching them through /api/image-proxy here makes the
+    // generation request wait for a second large-image download, which can turn an already
+    // successful upstream generation into a frontend 504/timeout on low-memory servers.
+    return images;
 }
 
 function readAxiosError(error: unknown, fallback: string) {

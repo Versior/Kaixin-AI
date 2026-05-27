@@ -39,9 +39,9 @@ export default function AdminCreditLogsPage() {
     const columns: ProColumns<AdminCreditLog>[] = [
         {
             title: "用户名",
-            dataIndex: "userId",
+            dataIndex: "username",
             width: 220,
-            render: (_, item) => <Typography.Text copyable>{item.username || "-"}</Typography.Text>,
+            render: (_, item) => <Typography.Text>{item.username || "-"}</Typography.Text>,
         },
         {
             title: "类型",

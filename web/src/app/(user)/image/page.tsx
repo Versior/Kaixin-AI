@@ -91,7 +91,7 @@ export default function ImagePage() {
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
-    const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
+    const generationCount = Math.max(1, Math.min(2, Number(config.count) || 1));
 
     useEffect(() => {
         if (!running || !startedAt) return;
@@ -166,12 +166,7 @@ export default function ImagePage() {
         const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
 
         try {
-            const logImages = await Promise.all(
-                successImages.map(async (image) => {
-                    const stored = await uploadImage(image.dataUrl);
-                    return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-                }),
-            );
+            const logImages = successImages;
             saveLog(
                 buildLog({
                     prompt: text,
@@ -253,15 +248,16 @@ export default function ImagePage() {
     const refreshLogs = async () => setLogs(await readStoredLogs());
 
     const previewGenerationLog = async (log: GenerationLog) => {
+        const resolvedLog = await resolveLogImages(log);
         setPreviewLog(log);
         setLogsOpen(false);
-        setPrompt(log.prompt);
-        setReferences(log.references || []);
-        if (log.config.imageModel || log.model) updateConfig("imageModel", log.config.imageModel || log.model);
-        if (log.config.quality) updateConfig("quality", log.config.quality);
-        if (log.config.size) updateConfig("size", log.config.size);
-        if (log.config.count) updateConfig("count", log.config.count);
-        setResults(log.images.map((image) => ({ id: image.id, status: "success", image })));
+        setPrompt(resolvedLog.prompt);
+        setReferences(resolvedLog.references || []);
+        if (resolvedLog.config.imageModel || resolvedLog.model) updateConfig("imageModel", resolvedLog.config.imageModel || resolvedLog.model);
+        if (resolvedLog.config.quality) updateConfig("quality", resolvedLog.config.quality);
+        if (resolvedLog.config.size) updateConfig("size", resolvedLog.config.size);
+        if (resolvedLog.config.count) updateConfig("count", resolvedLog.config.count);
+        setResults(resolvedLog.images.map((image) => ({ id: image.id, status: "success", image })));
     };
 
     const buildRequestSnapshot = () => {
@@ -483,7 +479,7 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
                 <ModelPicker config={config} value={model} onChange={(value) => updateConfig("imageModel", value)} fullWidth onMissingConfig={() => openConfigDialog(false)} />
             </label>
             <div className="col-span-2">
-                <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" maxCount={10} />
+                <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" maxCount={2} quickCount={2} />
             </div>
         </>
     );
@@ -679,14 +675,38 @@ async function readStoredLogs() {
         await logStore.iterate<GenerationLog, void>((value) => {
             values.push(value);
         });
-        const logs = await Promise.all(values.map(normalizeLog));
+        const logs = values.map(normalizeLogSummary);
         return logs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch {
         return [];
     }
 }
 
-async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
+function normalizeLogSummary(log: Partial<GenerationLog>): GenerationLog {
+    const config = normalizeLogConfig(log);
+    const images = log.images || [];
+    return {
+        id: log.id || nanoid(),
+        createdAt: log.createdAt || Date.now(),
+        title: log.title || log.model || "未命名",
+        prompt: log.prompt || log.title || "",
+        time: log.time || new Date().toLocaleString("zh-CN", { hour12: false }),
+        model: log.model || config.imageModel || "",
+        config,
+        references: log.references || [],
+        durationMs: log.durationMs || 0,
+        successCount: log.successCount ?? log.imageCount ?? images.length,
+        failCount: log.failCount || 0,
+        imageCount: log.imageCount || log.successCount || images.length,
+        size: log.size || config.size || "",
+        quality: log.quality || config.quality || "",
+        status: log.status || "成功",
+        images,
+        thumbnails: (log.thumbnails?.length ? log.thumbnails : images.map((image) => image.dataUrl || "")).map(thumbnailUrl).filter(Boolean),
+    };
+}
+
+async function resolveLogImages(log: GenerationLog): Promise<GenerationLog> {
     const references = await Promise.all(
         (log.references || []).map(async (item) => ({
             ...item,
@@ -717,7 +737,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         quality: log.quality || config.quality || "",
         status: log.status || "成功",
         images,
-        thumbnails: images.map((image) => image.dataUrl),
+        thumbnails: images.map((image) => thumbnailUrl(image.dataUrl)),
     };
 }
 
@@ -785,6 +805,11 @@ function buildLog({
         quality: logConfig.quality,
         status,
         images,
-        thumbnails: images.map((image) => image.dataUrl),
+        thumbnails: images.map((image) => thumbnailUrl(image.dataUrl)),
     };
+}
+
+function thumbnailUrl(url: string) {
+    if (!url) return "";
+    return /^https?:\/\//i.test(url) ? `/api/image-proxy?thumb=1&url=${encodeURIComponent(url)}` : url;
 }
