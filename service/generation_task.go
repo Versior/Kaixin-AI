@@ -28,6 +28,10 @@ func ListGenerationTasks(q model.Query) (GenerationTaskList, error) {
 	return GenerationTaskList{Items: items, Total: int(total)}, nil
 }
 
+func GenerationImageStats(todayPrefix string) (repository.GenerationImageStatsResult, error) {
+	return repository.GenerationImageStats(todayPrefix, 10)
+}
+
 func MarkGenerationTaskRunning(id string) error {
 	return repository.UpdateGenerationTaskStatus(id, model.GenerationTaskStatusRunning, now(), "", "")
 }

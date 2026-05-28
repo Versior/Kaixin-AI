@@ -73,6 +73,23 @@ export type AdminGenerationLogListResponse = {
     total: number;
 };
 
+export type AdminGenerationStats = {
+    totalImages: number;
+    todayImages: number;
+    successImages: number;
+    failedImages: number;
+    userRanks: Array<{
+        userId: string;
+        username: string;
+        tasks: number;
+        images: number;
+    }>;
+};
+
+export async function fetchAdminGenerationStats(token: string) {
+    return apiGet<AdminGenerationStats>("/api/admin/generation-stats", undefined, token);
+}
+
 export type AdminUserQuery = {
     keyword?: string;
     page?: number;

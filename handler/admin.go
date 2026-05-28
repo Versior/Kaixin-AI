@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
@@ -84,6 +85,16 @@ func AdminGenerationLogs(w http.ResponseWriter, r *http.Request) {
 
 func AdminGenerationTasks(w http.ResponseWriter, r *http.Request) {
 	result, err := service.ListGenerationTasks(parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func AdminGenerationStats(w http.ResponseWriter, r *http.Request) {
+	today := time.Now().Format("2006-01-02")
+	result, err := service.GenerationImageStats(today)
 	if err != nil {
 		FailError(w, err)
 		return

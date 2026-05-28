@@ -52,6 +52,7 @@ func New() *gin.Engine {
 	})
 	admin.GET("/generation-logs", gin.WrapF(handler.AdminGenerationLogs))
 	admin.GET("/generation-tasks", gin.WrapF(handler.AdminGenerationTasks))
+	admin.GET("/generation-stats", gin.WrapF(handler.AdminGenerationStats))
 	admin.POST("/generation-logs/batch-delete", gin.WrapF(handler.AdminDeleteGenerationLogs))
 	admin.DELETE("/generation-logs/:id", func(c *gin.Context) {
 		handler.AdminDeleteGenerationLog(c.Writer, c.Request, c.Param("id"))
