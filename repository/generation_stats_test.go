@@ -19,6 +19,7 @@ func TestGenerationTaskStatsCountsImagesAndRanksUsers(t *testing.T) {
 		{ID: "today-success", UserID: "user-1", Kind: model.GenerationLogKindImage, Status: "success", Images: []string{"c", "d", "e"}, CreatedAt: "2026-05-28T01:00:00Z"},
 		{ID: "today-partial", UserID: "user-2", Kind: model.GenerationLogKindImage, Status: "partial_success", Images: []string{"f"}, CreatedAt: "2026-05-28T02:00:00Z"},
 		{ID: "today-failed", UserID: "user-2", Kind: model.GenerationLogKindImage, Status: "failed", Images: nil, CreatedAt: "2026-05-28T03:00:00Z"},
+		{ID: "today-rate-limited", UserID: "user-2", Kind: model.GenerationLogKindImage, Status: "rate_limited", Images: nil, CreatedAt: "2026-05-28T03:30:00Z"},
 		{ID: "chat-log", UserID: "user-2", Kind: model.GenerationLogKindChat, Status: "success", Images: []string{"ignored"}, CreatedAt: "2026-05-28T04:00:00Z"},
 	}
 	for _, log := range logs {
@@ -31,7 +32,7 @@ func TestGenerationTaskStatsCountsImagesAndRanksUsers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
-	if stats.TotalImages != 6 || stats.TodayImages != 4 || stats.SuccessImages != 6 || stats.FailedImages != 0 {
+	if stats.TotalImages != 6 || stats.TodayImages != 4 || stats.SuccessImages != 6 || stats.FailedImages != 2 {
 		t.Fatalf("unexpected totals: %+v", stats)
 	}
 	if len(stats.UserRanks) != 2 {

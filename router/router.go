@@ -26,6 +26,7 @@ func New() *gin.Engine {
 	v1.OPTIONS("/images/generations", gin.WrapF(handler.AIImagesGenerations))
 	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
 	v1.GET("/images/tasks", gin.WrapF(handler.AIImageTasks))
+	v1.GET("/images/stats", gin.WrapF(handler.AIImageStats))
 	v1.GET("/images/history", gin.WrapF(handler.AIImageHistory))
 	v1.OPTIONS("/images/edits", gin.WrapF(handler.AIImagesEdits))
 	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))

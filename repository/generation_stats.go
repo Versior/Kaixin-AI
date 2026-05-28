@@ -37,16 +37,21 @@ func GenerationImageStats(todayPrefix string, rankLimit int) (GenerationImageSta
 	rankByUser := map[string]*GenerationUserRank{}
 	for _, log := range logs {
 		imageCount := len(log.Images)
-		if log.Status == "failed" || log.Status == "error" || imageCount == 0 {
-			stats.FailedImages += imageCount
+		isFailed := log.Status == "failed" || log.Status == "error" || log.Status == "rate_limited"
+		if isFailed {
+			failedCount := imageCount
+			if failedCount == 0 {
+				failedCount = 1
+			}
+			stats.FailedImages += failedCount
 		} else {
 			stats.SuccessImages += imageCount
+			stats.TotalImages += imageCount
+			if todayPrefix != "" && strings.HasPrefix(log.CreatedAt, todayPrefix) {
+				stats.TodayImages += imageCount
+			}
 		}
-		stats.TotalImages += imageCount
-		if todayPrefix != "" && strings.HasPrefix(log.CreatedAt, todayPrefix) {
-			stats.TodayImages += imageCount
-		}
-		if imageCount == 0 {
+		if imageCount == 0 || isFailed {
 			continue
 		}
 		rank := rankByUser[log.UserID]

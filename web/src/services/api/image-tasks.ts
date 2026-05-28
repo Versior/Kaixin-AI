@@ -21,6 +21,23 @@ export type ImageTaskStatus = {
     recent: ImageTaskInfo[];
 };
 
+export type ImageStats = {
+    totalImages: number;
+    todayImages: number;
+    successImages: number;
+    failedImages: number;
+    userRanks: Array<{
+        userId: string;
+        username: string;
+        tasks: number;
+        images: number;
+    }>;
+};
+
 export async function fetchImageTaskStatus() {
     return apiGet<ImageTaskStatus>("/api/v1/images/tasks", undefined, useUserStore.getState().token);
+}
+
+export async function fetchImageStats() {
+    return apiGet<ImageStats>("/api/v1/images/stats", undefined, useUserStore.getState().token);
 }

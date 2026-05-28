@@ -557,6 +557,15 @@ func AIImageTasks(w http.ResponseWriter, r *http.Request) {
 	OK(w, globalImageTaskQueue.Status())
 }
 
+func AIImageStats(w http.ResponseWriter, r *http.Request) {
+	result, err := service.GenerationImageStats(time.Now().Format("2006-01-02"))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func AIImageHistory(w http.ResponseWriter, r *http.Request) {
 	user, ok := service.UserFromContext(r.Context())
 	if !ok {
