@@ -64,6 +64,25 @@ func DB() (*gorm.DB, error) {
 	return db, dbErr
 }
 
+func ResetDBForTest(t interface{ Cleanup(func()) }) {
+	oldDB := db
+	oldOnce := dbOnce
+	oldErr := dbErr
+	db = nil
+	dbOnce = sync.Once{}
+	dbErr = nil
+	t.Cleanup(func() {
+		if db != nil {
+			if sqlDB, err := db.DB(); err == nil {
+				_ = sqlDB.Close()
+			}
+		}
+		db = oldDB
+		dbOnce = oldOnce
+		dbErr = oldErr
+	})
+}
+
 func dialector(driver string, dsn string) gorm.Dialector {
 	switch driver {
 	case "mysql":

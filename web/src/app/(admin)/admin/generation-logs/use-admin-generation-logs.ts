@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { deleteAdminGenerationLog, deleteAdminGenerationLogs, fetchAdminGenerationLogs, fetchAdminGenerationStats, fetchAdminUsers, type AdminGenerationLog, type AdminGenerationStats, type AdminUser } from "@/services/api/admin";
+import { deleteAdminGenerationLog, deleteAdminGenerationLogs, fetchAdminGenerationLogs, fetchAdminUsers, type AdminGenerationLog, type AdminUser } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const defaultPageSize = 8;
@@ -29,13 +29,6 @@ export function useAdminGenerationLogs() {
     const query = useQuery({
         queryKey: ["admin", "generation-logs", token, keyword, type, page, pageSize],
         queryFn: () => fetchAdminGenerationLogs(token, { keyword, type, page, pageSize }),
-        enabled: Boolean(token),
-        retry: false,
-    });
-
-    const statsQuery = useQuery({
-        queryKey: ["admin", "generation-stats", token],
-        queryFn: () => fetchAdminGenerationStats(token),
         enabled: Boolean(token),
         retry: false,
     });
@@ -83,8 +76,7 @@ export function useAdminGenerationLogs() {
 
     return {
         logs, keyword, kind: type, page, pageSize, total: query.data?.total || 0,
-        stats: statsQuery.data || { totalImages: 0, todayImages: 0, successImages: 0, failedImages: 0, userRanks: [] } as AdminGenerationStats,
-        isLoading: query.isFetching || usersQuery.isFetching || statsQuery.isFetching || deleteMutation.isPending || deletePageMutation.isPending,
+        isLoading: query.isFetching || usersQuery.isFetching || deleteMutation.isPending || deletePageMutation.isPending,
         searchLogs: (value = keyword) => updateFilters({ keyword: value }), changeKind: (value: string) => updateFilters({ type: value }), changePage: (value: number) => updateFilters({ page: value }), changePageSize: (value: number) => updateFilters({ pageSize: value }), resetFilters: () => updateFilters({ keyword: "", type: "", page: 1, pageSize: defaultPageSize }), refreshLogs: () => query.refetch(), deleteLog: (id: string) => deleteMutation.mutateAsync(id), deletePageLogs: (ids: string[]) => deletePageMutation.mutateAsync(ids),
     };
 }
