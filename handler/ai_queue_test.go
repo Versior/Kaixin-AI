@@ -40,6 +40,16 @@ func TestImageSubmissionLimiterCountsBatchAsOneSubmission(t *testing.T) {
 	}
 }
 
+func TestImageSubmissionLimiterDoesNotLimitCanvasInspiration(t *testing.T) {
+	resetImageSubmissionLimiterForTest()
+	user := model.AuthUser{ID: "guest", Role: model.UserRoleGuest}
+	for i := 0; i < 10; i++ {
+		if !allowImageBatchSubmission(user, 3, imageLimitScopeCanvas) {
+			t.Fatalf("canvas inspiration image batch %d should bypass limiter", i+1)
+		}
+	}
+}
+
 func TestImageTaskQueueSubmitsBatchAsOneAsyncTask(t *testing.T) {
 	queue := newImageTaskQueueWithCapacity(2)
 	started := make(chan struct{})

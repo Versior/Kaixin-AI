@@ -148,12 +148,13 @@ function aiRequestUrl(config: AiConfig, path: string) {
     return aiApiUrl(config, path);
 }
 
-function aiHeaders(config: AiConfig, contentType?: string) {
+function aiHeaders(config: AiConfig, contentType?: string, scope?: "canvas") {
     const token = useUserStore.getState().token;
     return config.channelMode === "remote"
         ? {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
               ...(contentType ? { "Content-Type": contentType } : {}),
+              ...(scope ? { "X-Infinite-Canvas-Scope": scope } : {}),
           }
         : {
               Authorization: `Bearer ${config.apiKey}`,
@@ -170,7 +171,11 @@ function withSystemMessage(config: AiConfig, messages: ChatCompletionMessage[]) 
     return systemPrompt ? [{ role: "system" as const, content: systemPrompt }, ...messages] : messages;
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string, count = 1) {
+export type ImageRequestOptions = {
+    scope?: "canvas";
+};
+
+export async function requestGeneration(config: AiConfig, prompt: string, count = 1, options: ImageRequestOptions = {}) {
     const n = Math.max(1, Math.min(3, Math.floor(Number(count) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
@@ -186,7 +191,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, count 
                 response_format: "url",
             },
             {
-                headers: aiHeaders(config, "application/json"),
+                headers: aiHeaders(config, "application/json", options.scope),
             },
         );
         const images = await hydrateRemoteImageUrls(parseImagePayload(response.data));
@@ -197,7 +202,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, count 
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], count = 1) {
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], count = 1, options: ImageRequestOptions = {}) {
     const n = Math.max(1, Math.min(3, Math.floor(Number(count) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
@@ -216,7 +221,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     files.forEach((file) => formData.append("image", file));
 
     try {
-        const response = await axios.post<ImageApiResponse>(aiRequestUrl(config, "/images/edits"), formData, { headers: aiHeaders(config) });
+        const response = await axios.post<ImageApiResponse>(aiRequestUrl(config, "/images/edits"), formData, { headers: aiHeaders(config, undefined, options.scope) });
         const images = await hydrateRemoteImageUrls(parseImagePayload(response.data));
         refreshRemoteUser(config);
         return images;
