@@ -1,195 +1,138 @@
-# 后端数据库说明
+# 后端数据库
 
-本文档只记录后端当前已经使用的主要数据表。
+后端使用 GORM 管理数据库连接和表结构迁移。默认数据库是 SQLite，路径通常在容器 `/app/data` 下。也可以通过配置切换到 MySQL 或 PostgreSQL。
 
-## 数据库
+启动时执行 `AutoMigrate`。本文档只记录当前代码实际使用的数据表和关键字段。
 
-后端使用 GORM 管理数据库连接和表结构迁移。
+## users
 
-支持的存储驱动：
+用户表。保存账号、角色、算力点、第三方登录标识和注册 IP。
 
-- `sqlite`
-- `mysql`
-- `postgresql`
+关键字段：
 
-当前启动时执行 `AutoMigrate`，自动维护以下表：
+- `id`：用户 ID。
+- `username`：用户名，唯一。
+- `password`：密码哈希。
+- `email`：邮箱。
+- `display_name`：昵称。
+- `avatar_url`：头像。
+- `role`：角色，`user` 或 `admin`。
+- `credits`：算力点余额。
+- `aff_code`：邀请码。
+- `aff_count`：邀请人数冗余统计。
+- `inviter_id`：邀请人 ID。
+- `github_id`：GitHub 用户 ID。
+- `linux_do_id`：Linux.do 用户 ID。
+- `wechat_id`：微信用户 ID。
+- `register_ip`：注册 IP。同一 IP 只允许注册一个用户。
+- `status`：用户状态，`active` 或 `ban`。
+- `last_login_at`：最近登录时间。
+- `extra`：扩展 JSON，第三方资料按平台命名空间保存。
+- `created_at` / `updated_at`：创建和更新时间。
 
-- `users`
-- `credit_logs`
-- `prompts`
-- `assets`
-- `settings`
+## credit_logs
 
-后续新增表时再同步补充本文档，未实际使用的规划表不提前写入。
+算力点流水表。记录管理员调整、模型调用扣费、失败退费等变化。
 
-### users
+关键字段：
 
-系统用户表。用户基础信息、角色、算力点余额和第三方登录标识放在该表中。
+- `id`：流水 ID。
+- `user_id`：用户 ID。
+- `username`：用户名快照。
+- `type`：流水类型。
+- `amount`：变化数量，扣费为负数，充值或退费为正数。
+- `balance`：变化后的余额。
+- `remark`：备注。
+- `created_at`：创建时间。
 
-| 字段              | 类型     | 说明                       |
-|-----------------|--------|--------------------------|
-| `id`            | string | 主键                       |
-| `username`      | string | 用户名，唯一索引                 |
-| `password`      | string | 密码哈希                     |
-| `email`         | string | 邮箱                       |
-| `display_name`  | string | 昵称                       |
-| `avatar_url`    | string | 头像地址                     |
-| `role`          | string | 角色：`user`、`admin`        |
-| `credits`       | number | 算力点余额                    |
-| `aff_code`      | string | 用户自己的邀请码，唯一索引            |
-| `aff_count`     | number | 已邀请用户数量，冗余统计字段           |
-| `inviter_id`    | string | 邀请人用户 ID                 |
-| `github_id`     | string | GitHub 用户 ID               |
-| `linux_do_id`   | string | Linux.do 用户 ID            |
-| `wechat_id`     | string | 微信用户 ID                   |
-| `status`        | string | 用户状态：`active`、`ban`       |
-| `last_login_at` | string | 最近登录时间                   |
-| `extra`         | json   | 扩展信息，第三方资料按平台命名空间保存，如 `linuxDo` |
-| `created_at`    | string | 创建时间                     |
-| `updated_at`    | string | 更新时间                     |
+## prompts
 
-### prompts
+提示词表。保存公开提示词、同步自 GitHub 的提示词案例和后台手工维护内容。
 
-提示词表。用于保存公开提示词、内置 GitHub 系统提示词、分类和预览内容。
+关键字段：
 
-| 字段           | 类型     | 说明                           |
-|--------------|--------|------------------------------|
-| `id`         | string | 主键                           |
-| `title`      | string | 标题                           |
-| `cover_url`  | string | 封面图                          |
-| `prompt`     | string | 提示词内容                        |
-| `tags`       | json   | 标签列表                         |
-| `category`   | string | 分类标识                         |
-| `preview`    | text   | Markdown 展示内容，可包含文本、图片、视频链接等 |
-| `created_at` | string | 创建时间                         |
-| `updated_at` | string | 更新时间                         |
+- `id`：提示词 ID。
+- `title`：标题。
+- `cover_url`：封面。
+- `prompt`：提示词正文。
+- `tags`：标签数组 JSON。
+- `category`：分类。
+- `preview`：Markdown 预览内容。
+- `created_at` / `updated_at`：创建和更新时间。
 
-`github_url` 仅用于接口返回，不写入数据库。
+`github_url` 只用于接口返回，不作为核心数据库字段依赖。
 
-### assets
+## assets
 
-素材表。当前用于后台素材库。
+后台素材表。
 
-| 字段               | 类型     | 说明                            |
-|------------------|--------|-------------------------------|
-| `id`             | string | 主键                            |
-| `title`          | string | 标题                            |
-| `type`           | string | 素材类型：`text`、`image`、`video` 等 |
-| `cover_url`      | string | 封面图                           |
-| `tags`           | json   | 标签列表                          |
-| `category`       | string | 分类标识                          |
-| `description`    | string | 描述                            |
-| `content`        | text   | 文本或 Markdown 内容               |
-| `url`            | string | 图片、视频等媒体地址                    |
-| `created_at`     | string | 创建时间                          |
-| `updated_at`     | string | 更新时间                          |
+关键字段：
 
-### settings
+- `id`：素材 ID。
+- `title`：标题。
+- `type`：素材类型，如图片或视频。
+- `url`：资源地址。
+- `cover_url`：封面地址。
+- `tags`：标签数组 JSON。
+- `description`：说明。
+- `created_at` / `updated_at`：创建和更新时间。
 
-系统配置表，只保存两行数据：`public` 放前端可读取的公开配置，`private` 放仅后端和管理员可读取的私有配置，配置值都用 JSON。
+## settings
 
-| 字段           | 类型     | 说明                    |
-|--------------|--------|-----------------------|
-| `key`        | string | 主键：`public`、`private` |
-| `value`      | json   | 配置内容                  |
-| `created_at` | string | 创建时间                  |
-| `updated_at` | string | 更新时间                  |
+系统配置表。当前主要使用两行：`public` 和 `private`。
 
-`public.value` 常放前端展示和可公开读取的配置，例如模型列表、登录开关等。
-`private.value` 常放渠道密钥、登录密钥、后台内部开关等。
+- `public`：公开配置，前端可以读取。
+- `private`：私有配置，只给后端和管理员使用。
 
-当前系统设置接口会按后端结构体序列化和反序列化已知字段；数据库 JSON 中额外存在的旧字段会被忽略。
+字段：
 
-`public.value` 当前字段：
+- `id`：配置 key。
+- `value`：配置 JSON。
+- `updated_at`：更新时间。
 
-| 字段                | 类型       | 说明             |
-|-------------------|----------|----------------|
-| `modelChannel` | object | 模型渠道公开配置组 |
-| `auth` | object | 公开登录配置 |
+详细结构见 `docs/system-settings.md`。
 
-`modelChannel` 当前字段：
+## generation_logs
 
-| 字段                | 类型       | 说明             |
-|-------------------|----------|----------------|
-| `availableModels` | string[] | 系统可用模型列表       |
-| `modelCosts` | object[] | 模型算力点配置       |
-| `defaultModel`    | string   | 默认模型           |
-| `defaultImageModel` | string | 默认图片模型         |
-| `defaultVideoModel` | string | 默认视频模型         |
-| `defaultTextModel` | string  | 默认文本模型         |
-| `systemPrompt`    | string   | 系统提示词          |
-| `allowCustomChannel` | bool    | 是否允许用户自定义渠道，默认允许，关闭后前端只提供走后端渠道的模式 |
+生成日志表。记录用户通过后端代理发起的模型调用审计信息。
 
-`modelCosts` 每项字段：
+关键字段：
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `model` | string | 模型名称 |
-| `credits` | number | 每次后端模型接口调用前预扣的算力点，未配置默认不扣除 |
+- `id`：日志 ID。
+- `user_id`：用户 ID。
+- `username`：用户名快照。
+- `type`：生成类型，如 `image`、`text`、`video`。
+- `model`：模型名。
+- `status`：状态，如 `success`、`failed`、`rate_limited`。
+- `image_count`：成功产出的图片张数。
+- `prompt`：提示词摘要或必要内容。
+- `error_message`：错误信息。
+- `request`：请求摘要。
+- `response`：响应摘要。
+- `created_at`：创建时间。
 
-`auth.linuxDo` 当前字段：
+用户端历史接口只返回当前用户自己的安全字段。管理员后台可查看全站日志。
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `enabled` | bool | 是否开启 Linux.do 登录 |
+## generation_tasks
 
-`private.value` 当前字段：
+全站生图任务表。记录进入异步队列的图片生成任务。
 
-| 字段         | 类型       | 说明       |
-|------------|----------|----------|
-| `channels` | object[] | 模型渠道配置列表 |
-| `promptSync` | object | GitHub 远程提示词定时同步配置 |
-| `auth` | object | 私有登录配置 |
+关键字段：
 
-`channels` 每项字段：
+- `id`：任务 ID。
+- `user_id`：用户 ID。
+- `username`：用户名快照。
+- `model`：模型名。
+- `batch_count`：本任务请求生成的图片张数。
+- `status`：`queued`、`running`、`succeeded`、`failed` 等状态。
+- `error_message`：失败原因。
+- `created_at` / `updated_at`：创建和更新时间。
 
-| 字段       | 类型       | 说明       |
-|----------|----------|----------|
-| `protocol` | string | 协议，当前支持 `openai` |
-| `name`   | string   | 渠道名称     |
-| `baseUrl` | string  | 渠道接口地址   |
-| `apiKey` | string   | 渠道密钥     |
-| `models` | string[] | 渠道可用模型列表 |
-| `weight` | number   | 渠道权重，同一模型命中多个渠道时按权重随机 |
-| `enabled` | bool    | 是否启用     |
-| `remark` | string   | 备注       |
+全站任务面板读取该表和内存队列状态。统计排行主要按成功图片产出统计。
 
-`promptSync` 字段：
+## 数据一致性约定
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `enabled` | bool | 是否开启定时同步，默认开启 |
-| `cron` | string | Cron 表达式，默认每 5 分钟 |
-
-`auth.linuxDo` 当前字段：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `clientId` | string | Linux.do OAuth App Client ID |
-| `clientSecret` | string | Linux.do OAuth App Client Secret，后台返回时隐藏 |
-
-后端请求模型时，先按模型名筛选启用且包含该模型的渠道，再按 `weight` 加权随机选择一个渠道。
-
-### credit_logs
-
-用户算力点变更流水表。当前记录后台手动调整、模型调用预扣和模型调用失败返还。
-
-| 字段           | 类型     | 说明                       |
-|--------------|--------|--------------------------|
-| `id`         | string | 主键                       |
-| `user_id`    | string | 关联用户 ID                  |
-| `type`       | string | 类型：`admin_adjust`、`ai_consume`、`ai_refund` |
-| `amount`     | number | 本次变动数量，增加为正，扣减为负         |
-| `balance`    | number | 变动后的用户算力点余额              |
-| `related_id` | string | 关联业务 ID，可为空                |
-| `remark`     | string | 备注                       |
-| `extra`      | json   | 扩展信息                     |
-| `created_at` | string | 创建时间                     |
-
-`type` 当前取值：
-
-| 值 | 说明 |
-| --- | --- |
-| `admin_adjust` | 后台手动调整 |
-| `ai_consume` | 调用后端模型接口消费 |
-| `ai_refund` | 后端模型接口调用失败返还 |
+- 算力点扣费和退费必须写入 `credit_logs`。
+- 上游失败、空返回或少返回图片时，需要退还未产出的图片算力点。
+- `generation_logs` 用于审计和历史，`generation_tasks` 用于任务状态，两者口径不同。
+- 公开接口不能暴露上游 API Key、完整私有请求头或服务器内部路径。

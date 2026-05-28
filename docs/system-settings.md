@@ -1,13 +1,12 @@
-# 系统配置数据结构
+# 系统配置
 
-系统配置保存在 `settings` 表中，目前只使用两行：
+系统配置保存在 `settings` 表中，主要分为公开配置 `public` 和私有配置 `private`。
 
-| key | 说明 |
-| --- | --- |
-| `public` | 公开配置，前端可以读取 |
-| `private` | 私有配置，只给后端和管理员使用 |
+公开配置会返回给前端。私有配置只允许管理员读取，后端调用模型时也会使用私有配置。
 
 ## public.value
+
+示例：
 
 ```json
 {
@@ -28,94 +27,98 @@
     "linuxDo": {
       "enabled": false
     }
+  },
+  "announcement": {
+    "enabled": false,
+    "title": "",
+    "content": "",
+    "version": "",
+    "oncePerVersion": true
   }
 }
 ```
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `modelChannel` | object | 模型渠道公开配置组 |
-| `auth` | object | 认证相关公开配置 |
+### modelChannel
 
-`modelChannel` 字段：
+- `availableModels`：前端允许选择的系统模型。
+- `modelCosts`：模型算力点价格。后端请求前按模型匹配预扣。
+- `defaultModel`：默认模型。
+- `defaultImageModel`：默认图片模型。
+- `defaultTextModel`：默认文本模型。
+- `systemPrompt`：系统提示词。
+- `allowCustomChannel`：是否允许用户在浏览器本地配置自定义渠道。
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `availableModels` | string[] | 系统可用模型，由管理员手动选择；页面下拉选项可来自私有渠道模型 |
-| `modelCosts` | object[] | 模型算力点配置，后端模型接口调用前按模型预扣，上游失败时返还；未配置默认不扣除 |
-| `defaultModel` | string | 默认模型，从 `availableModels` 中选择 |
-| `defaultImageModel` | string | 默认图片模型，从 `availableModels` 中选择 |
-| `defaultTextModel` | string | 默认文本模型，从 `availableModels` 中选择 |
-| `systemPrompt` | string | 系统提示词 |
-| `allowCustomChannel` | boolean | 是否允许用户在配置弹窗中切换为本地直连渠道，默认允许 |
+`modelCosts` 每项：
 
-`modelCosts` 每项字段：
+- `model`：模型名。
+- `credits`：每次或每张图片消耗的算力点，具体由调用链路解释。
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `model` | string | 模型名称 |
-| `credits` | number | 每次后端模型接口调用前预扣的算力点 |
+### auth
 
-用户侧请求模式：
+- `allowRegister`：是否允许账号密码注册。
+- `linuxDo.enabled`：是否开启 Linux.do 登录。
 
-| 模式 | 说明 |
-| --- | --- |
-| 云端渠道 | 使用后端 `/api/v1/*` 代理接口，请求会按模型名匹配 `private.value.channels` 中的可用渠道 |
-| 本地直连 | 默认可选；`allowCustomChannel` 关闭后不可选，用户在浏览器本地配置 `baseUrl`、`apiKey` 和模型列表后直接请求模型接口 |
+注册开启时，系统仍会检查注册 IP。同一 IP 只能注册一个用户。
 
-`auth` 字段：
+### announcement
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `allowRegister` | boolean | 是否允许用户注册，默认允许；关闭后注册入口隐藏，注册接口拒绝新用户创建 |
-| `linuxDo.enabled` | boolean | 是否开启 Linux.do 登录 |
+网站公告弹窗配置：
+
+- `enabled`：是否启用。
+- `title`：公告标题。
+- `content`：公告内容。
+- `version`：公告版本。版本变化后可重新弹出。
+- `oncePerVersion`：同一版本是否只弹一次。
 
 ## private.value
+
+示例：
 
 ```json
 {
   "channels": [
     {
-      "protocol": "openai",
+      "id": "channel-1",
       "name": "默认渠道",
-      "baseUrl": "https://api.example.com",
+      "protocol": "openai",
+      "baseUrl": "https://example.com/v1",
       "apiKey": "sk-xxx",
-      "models": ["gpt-5.5", "gpt-image-2"],
-      "weight": 1,
-      "enabled": true,
-      "remark": ""
+      "models": ["gpt-image-2", "gpt-5.5"],
+      "enabled": true
     }
   ],
-  "promptSync": {
-    "enabled": true,
-    "cron": "*/5 * * * *"
+  "oauth": {
+    "linuxDo": {
+      "clientId": "",
+      "clientSecret": "",
+      "redirectUri": ""
+    }
   }
 }
 ```
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `channels` | object[] | 模型渠道列表 |
-| `promptSync` | object | GitHub 远程提示词定时同步配置 |
+### channels
 
-`channels` 每项字段：
+模型渠道列表。后端代理 `/api/v1/*` 请求时按模型名选择启用渠道。
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `protocol` | string | 协议，当前为 `openai` |
-| `name` | string | 渠道名称 |
-| `baseUrl` | string | OpenAI 兼容接口地址 |
-| `apiKey` | string | 渠道密钥 |
-| `models` | string[] | 该渠道可用模型 |
-| `weight` | number | 渠道权重；同一模型有多个可用渠道时按权重随机 |
-| `enabled` | boolean | 是否启用 |
-| `remark` | string | 备注 |
+- `id`：渠道 ID。
+- `name`：渠道名称。
+- `protocol`：协议，目前按 OpenAI 兼容接口处理。
+- `baseUrl`：上游 Base URL。
+- `apiKey`：上游 API Key，只能存在私有配置里。
+- `models`：该渠道可用模型。
+- `enabled`：是否启用。
 
-后端调用模型时，会从已启用、已配置 `baseUrl` 和 `apiKey`、且 `models` 包含目标模型的渠道中选择一个。
+### oauth.linuxDo
 
-`promptSync` 字段：
+Linux.do 登录配置：
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `enabled` | boolean | 是否开启定时同步，默认开启 |
-| `cron` | string | Cron 表达式，默认每 5 分钟 |
+- `clientId`
+- `clientSecret`
+- `redirectUri`
+
+## 配置安全
+
+- `private.value` 不能返回给普通前端接口。
+- `apiKey` 不能进入前端、普通日志或错误消息。
+- 更新配置后应验证模型列表、登录入口和公告弹窗是否符合预期。
