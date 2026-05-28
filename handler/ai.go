@@ -100,7 +100,11 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 	batchCount := readAIRequestCount(body, contentType)
-	body, contentType = normalizeImageRequest(path, body, contentType)
+	body, contentType, err = normalizeImageRequestStrict(path, body, contentType)
+	if err != nil {
+		Fail(w, "AI 接口请求失败："+err.Error())
+		return
+	}
 	credits *= batchCount
 	if isImageAIPath(path) {
 		if !allowImageBatchSubmission(user, batchCount) {
@@ -340,11 +344,14 @@ func allowImageBatchSubmission(user model.AuthUser, batchCount int) bool {
 		}
 	}
 	const maxImageSubmissionsPerWindow = 3
-	if len(kept) >= maxImageSubmissionsPerWindow {
+	if len(kept)+batchCount > maxImageSubmissionsPerWindow {
 		imageSubmissionLimiter.items[user.ID] = kept
 		return false
 	}
-	imageSubmissionLimiter.items[user.ID] = append(kept, nowTime)
+	for i := 0; i < batchCount; i++ {
+		kept = append(kept, nowTime)
+	}
+	imageSubmissionLimiter.items[user.ID] = kept
 	return true
 }
 
@@ -581,64 +588,92 @@ func AIImageHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 func normalizeImageRequest(path string, body []byte, contentType string) ([]byte, string) {
-	if !isImageAIPath(path) {
+	updatedBody, updatedType, err := normalizeImageRequestStrict(path, body, contentType)
+	if err != nil {
 		return body, contentType
+	}
+	return updatedBody, updatedType
+}
+
+func normalizeImageRequestStrict(path string, body []byte, contentType string) ([]byte, string, error) {
+	if !isImageAIPath(path) {
+		return body, contentType, nil
 	}
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		return normalizeMultipartImageRequest(body, contentType)
 	}
 	var payload map[string]any
 	if json.Unmarshal(body, &payload) != nil {
-		return body, contentType
+		return body, contentType, nil
 	}
 	payload["response_format"] = "url"
-	payload["n"] = 1
+	if _, ok := payload["n"]; !ok {
+		payload["n"] = 1
+	}
 	updated, err := json.Marshal(payload)
 	if err != nil {
-		return body, contentType
+		return body, contentType, err
 	}
-	return updated, contentType
+	return updated, contentType, nil
 }
 
-func normalizeMultipartImageRequest(body []byte, contentType string) ([]byte, string) {
+func normalizeMultipartImageRequest(body []byte, contentType string) ([]byte, string, error) {
 	_, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		return body, contentType
+		return body, contentType, nil
 	}
 	form, err := multipart.NewReader(bytes.NewReader(body), params["boundary"]).ReadForm(64 << 20)
 	if err != nil {
-		return body, contentType
+		return body, contentType, nil
 	}
 	defer form.RemoveAll()
 	var buffer bytes.Buffer
 	writer := multipart.NewWriter(&buffer)
 	for key, values := range form.Value {
-		if key == "response_format" || key == "n" {
+		if key == "response_format" {
 			continue
 		}
 		for _, value := range values {
 			_ = writer.WriteField(key, value)
 		}
 	}
+	if len(form.Value["n"]) == 0 {
+		_ = writer.WriteField("n", "1")
+	}
 	_ = writer.WriteField("response_format", "url")
-	_ = writer.WriteField("n", "1")
 	for key, files := range form.File {
 		for _, fileHeader := range files {
+			if fileHeader.Size == 0 {
+				_ = writer.Close()
+				return nil, "", fmt.Errorf("图片文件为空：%s", fileHeader.Filename)
+			}
 			file, err := fileHeader.Open()
 			if err != nil {
-				continue
+				_ = writer.Close()
+				return nil, "", err
 			}
 			part, err := writer.CreateFormFile(key, fileHeader.Filename)
-			if err == nil {
-				_, _ = io.Copy(part, file)
+			if err != nil {
+				_ = file.Close()
+				_ = writer.Close()
+				return nil, "", err
 			}
+			written, copyErr := io.Copy(part, file)
 			_ = file.Close()
+			if copyErr != nil {
+				_ = writer.Close()
+				return nil, "", copyErr
+			}
+			if written == 0 {
+				_ = writer.Close()
+				return nil, "", fmt.Errorf("图片文件为空：%s", fileHeader.Filename)
+			}
 		}
 	}
-	if writer.Close() != nil {
-		return body, contentType
+	if err := writer.Close(); err != nil {
+		return body, contentType, err
 	}
-	return buffer.Bytes(), writer.FormDataContentType()
+	return buffer.Bytes(), writer.FormDataContentType(), nil
 }
 
 func readAIRequest(r *http.Request) ([]byte, string, string, error) {

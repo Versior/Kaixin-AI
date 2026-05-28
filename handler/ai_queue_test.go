@@ -32,13 +32,11 @@ func TestImageSubmissionLimiterIsPerUserAndAdminUnlimited(t *testing.T) {
 func TestImageSubmissionLimiterCountsBatchAsOneSubmission(t *testing.T) {
 	resetImageSubmissionLimiterForTest()
 	user := model.AuthUser{ID: "user-a", Role: model.UserRoleUser}
-	for i := 0; i < 3; i++ {
-		if !allowImageBatchSubmission(user, 3) {
-			t.Fatalf("batch submission %d should be allowed", i+1)
-		}
+	if !allowImageBatchSubmission(user, 3) {
+		t.Fatal("three image batch should be allowed")
 	}
 	if allowImageBatchSubmission(user, 1) {
-		t.Fatal("fourth batch submission in three minutes should be blocked")
+		t.Fatal("fourth image in three minutes should be blocked")
 	}
 }
 
