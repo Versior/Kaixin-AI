@@ -64,6 +64,18 @@ type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "
 
 type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
 
+function previewImageUrl(url: string) {
+    return url.startsWith("http") ? `/api/image-proxy?thumb=1&url=${encodeURIComponent(url)}` : url;
+}
+
+function usableImageUrl(url: string) {
+    return url.startsWith("http") ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url;
+}
+
+function normalizeWorkbenchImage(image: GeneratedImage): GeneratedImage {
+    return { ...image, dataUrl: usableImageUrl(image.dataUrl) };
+}
+
 export default function ImagePage() {
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -281,7 +293,7 @@ export default function ImagePage() {
         if (log.config.quality) updateConfig("quality", log.config.quality);
         if (log.config.size) updateConfig("size", log.config.size);
         if (log.config.count) updateConfig("count", log.config.count);
-        setResults(log.images.map((image) => ({ id: image.id, status: "success", image })));
+        setResults(log.images.map((image) => ({ id: image.id, status: "success", image: normalizeWorkbenchImage(image) })));
     };
 
     const buildRequestSnapshot = () => {
@@ -610,7 +622,7 @@ function ResultImageCard({
 }) {
     return (
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
-            <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className="aspect-square object-cover" />
+            <Image src={previewImageUrl(image.dataUrl)} alt={`生成结果 ${index + 1}`} className="aspect-square object-cover" preview={{ src: usableImageUrl(image.dataUrl) }} />
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-stone-200 px-3 py-2.5 dark:border-stone-800">
                 <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
                     <span>
@@ -746,7 +758,7 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
                         {log.thumbnails?.length ? (
                             <div className="mt-2 flex gap-1 overflow-hidden">
                                 {log.thumbnails.slice(0, 4).map((image, index) => (
-                                    <img key={`${log.id}-${index}`} src={image} alt="" className="size-8 shrink-0 rounded-md object-cover" />
+                                    <img key={`${log.id}-${index}`} src={previewImageUrl(image)} alt="" className="size-8 shrink-0 rounded-md object-cover" />
                                 ))}
                             </div>
                         ) : null}
