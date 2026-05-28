@@ -181,11 +181,8 @@ func executeAIProxyRequest(ctx context.Context, userID string, modelName string,
 		}
 		failed = usage.Failed
 	}
-	refundCredits := credits
-	if !usage.Failed && usage.RefundCredits > 0 {
-		refundCredits = usage.RefundCredits
-	}
-	if failed || refundCredits > 0 {
+	refundCredits := refundCreditsForAIResult(failed, usage, credits)
+	if refundCredits > 0 {
 		if err := service.RefundUserCreditsForTask(userID, modelName, refundCredits, path, taskID); err != nil {
 			log.Printf("AI proxy refund credits failed: user=%s task=%s model=%s credits=%d err=%v", userID, taskID, modelName, refundCredits, err)
 		}
@@ -206,6 +203,16 @@ type imageResponseUsage struct {
 	RefundCredits  int
 	Partial        bool
 	Failed         bool
+}
+
+func refundCreditsForAIResult(failed bool, usage imageResponseUsage, originalCredits int) int {
+	if usage.RefundCredits > 0 {
+		return usage.RefundCredits
+	}
+	if failed && usage.ActualImages == 0 {
+		return originalCredits
+	}
+	return 0
 }
 
 func analyzeImageResponseUsage(path string, responseBody []byte, requestedCount int, creditPerImage int) imageResponseUsage {

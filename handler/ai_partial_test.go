@@ -2,6 +2,25 @@ package handler
 
 import "testing"
 
+func TestRefundCreditsReturnsZeroForFullImageSuccess(t *testing.T) {
+	payload := []byte(`{"data":[{"url":"https://example.com/a.png"}]}`)
+	usage := analyzeImageResponseUsage("/images/generations", payload, 1, 10)
+	if usage.Failed || usage.Status != "success" {
+		t.Fatalf("full image success should stay success: %#v", usage)
+	}
+	if refundCreditsForAIResult(false, usage, 10) != 0 {
+		t.Fatalf("full image success should not refund credits: %#v", usage)
+	}
+}
+
+func TestRefundCreditsReturnsFullAmountForEmptyImageFailure(t *testing.T) {
+	payload := []byte(`{"data":[]}`)
+	usage := analyzeImageResponseUsage("/images/generations", payload, 1, 10)
+	if refundCreditsForAIResult(true, usage, 10) != 10 {
+		t.Fatalf("empty image failure should refund original credits: %#v", usage)
+	}
+}
+
 func TestImageResponseUsageDetectsPartialSuccess(t *testing.T) {
 	payload := []byte(`{"data":[{"url":"https://example.com/a.png"},{"url":"https://example.com/b.png"}]}`)
 	usage := analyzeImageResponseUsage("/images/generations", payload, 3, 3)
