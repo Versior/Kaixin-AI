@@ -78,3 +78,14 @@ func DeleteGenerationLogs(ids []string) error {
 	}
 	return db.Delete(&model.GenerationLog{}, "id IN ?", ids).Error
 }
+
+func DeleteUserGenerationLogs(userID string, ids []string) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return db.Delete(&model.GenerationLog{}, "user_id = ? AND id IN ?", userID, ids).Error
+}

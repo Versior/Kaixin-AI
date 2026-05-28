@@ -62,6 +62,10 @@ func DeleteGenerationLog(id string) error { return repository.DeleteGenerationLo
 
 func DeleteGenerationLogs(ids []string) error { return repository.DeleteGenerationLogs(ids) }
 
+func DeleteUserGenerationLogs(userID string, ids []string) error {
+	return repository.DeleteUserGenerationLogs(userID, ids)
+}
+
 func BuildGenerationLog(userID string, path string, modelName string, requestBody []byte, responseBody []byte, status string, errMessage string) model.GenerationLog {
 	return BuildGenerationLogForTask("", userID, path, modelName, requestBody, responseBody, status, errMessage)
 }

@@ -3,7 +3,6 @@
 import { BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Typography } from "antd";
-import localforage from "localforage";
 import { saveAs } from "file-saver";
 
 import { ImageSettingsPanel } from "@/components/image-settings-panel";
@@ -18,7 +17,8 @@ import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { fetchImageStats, type ImageStats } from "@/services/api/image-stats";
 import { fetchImageTaskStatus, type ImageTaskStatus } from "@/services/api/image-tasks";
-import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { deleteImageHistory, fetchImageHistory, type ImageHistoryLog } from "@/services/api/image-history";
+import { uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import type { ReferenceImage } from "@/types/image";
 
@@ -63,9 +63,6 @@ type GenerationLog = {
 type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "count">;
 
 type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
-
-const LOG_STORE_KEY = "infinite-canvas:image_generation_logs";
-const logStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
 
 export default function ImagePage() {
     const { message } = App.useApp();
@@ -259,8 +256,7 @@ export default function ImagePage() {
     };
 
     const deleteSelectedLogs = () => {
-        const imageKeys = logs.filter((log) => selectedLogIds.includes(log.id)).flatMap((log) => log.images.map((image) => image.storageKey).filter((key): key is string => Boolean(key)));
-        void Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]).then(refreshLogs);
+        void deleteImageHistory(selectedLogIds).then(refreshLogs).catch((error) => message.error(error instanceof Error ? error.message : "删除生成记录失败"));
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
             setResults([]);
@@ -270,7 +266,8 @@ export default function ImagePage() {
     };
 
     const saveLog = (log: GenerationLog) => {
-        void logStore.setItem(log.id, serializeLog(log)).then(refreshLogs);
+        setLogs((value) => [log, ...value.filter((item) => item.id !== log.id)]);
+        window.setTimeout(() => void refreshLogs(), 1500);
     };
 
     const refreshLogs = async () => setLogs(await readStoredLogs());
@@ -784,68 +781,44 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
 async function readStoredLogs() {
     if (typeof window === "undefined") return [];
     try {
-        const values: GenerationLog[] = [];
-        await logStore.iterate<GenerationLog, void>((value) => {
-            values.push(value);
-        });
-        const logs = await Promise.all(values.map(normalizeLog));
-        return logs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const data = await fetchImageHistory({ page: 1, pageSize: 50, type: "image" });
+        return (data.items || []).map(cloudLogToGenerationLog);
     } catch {
         return [];
     }
 }
 
-async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
-    const references = await Promise.all(
-        (log.references || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
-        })),
-    );
-    const images = await Promise.all(
-        (log.images || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
-        })),
-    );
-    const config = normalizeLogConfig(log);
+function cloudLogToGenerationLog(log: ImageHistoryLog): GenerationLog {
+    const created = log.createdAt ? new Date(log.createdAt) : new Date();
+    const createdAt = Number.isNaN(created.getTime()) ? Date.now() : created.getTime();
+    const images: GeneratedImage[] = (log.images || []).map((url, index) => ({
+        id: `${log.id}-${index}`,
+        dataUrl: url,
+        durationMs: 0,
+        width: 0,
+        height: 0,
+        bytes: 0,
+    }));
+    const successCount = images.length;
+    const failed = log.status !== "success" && log.status !== "succeeded" && log.status !== "partial_success";
     return {
-        id: log.id || nanoid(),
-        createdAt: log.createdAt || Date.now(),
-        title: log.title || log.model || "未命名",
-        prompt: log.prompt || log.title || "",
-        time: log.time || new Date().toLocaleString("zh-CN", { hour12: false }),
-        model: log.model || config.imageModel || "",
-        config,
-        references,
-        durationMs: log.durationMs || 0,
-        successCount: log.successCount ?? log.imageCount ?? 0,
-        failCount: log.failCount || 0,
-        imageCount: log.imageCount || log.successCount || 0,
-        size: log.size || config.size || "",
-        quality: log.quality || config.quality || "",
-        status: log.status || "成功",
+        id: log.id,
+        createdAt,
+        title: (log.prompt || log.model || "生成记录").slice(0, 12),
+        prompt: log.prompt || "",
+        time: created.toLocaleString("zh-CN", { hour12: false }),
+        model: log.model || "",
+        config: { model: log.model || "", imageModel: log.model || "", quality: "", size: "", count: String(Math.max(1, successCount)) },
+        references: [],
+        durationMs: 0,
+        successCount,
+        failCount: failed ? 1 : 0,
+        imageCount: successCount,
+        size: "",
+        quality: "",
+        status: failed ? "失败" : "成功",
         images,
         thumbnails: images.map((image) => image.dataUrl),
-    };
-}
-
-function serializeLog(log: GenerationLog): GenerationLog {
-    return {
-        ...log,
-        references: log.references.map((item) => ({ ...item, dataUrl: item.storageKey ? "" : item.dataUrl })),
-        images: log.images.map((image) => ({ ...image, dataUrl: image.storageKey ? "" : image.dataUrl })),
-        thumbnails: [],
-    };
-}
-
-function normalizeLogConfig(log: Partial<GenerationLog>): GenerationLogConfig {
-    return {
-        model: log.config?.model || log.model || "",
-        imageModel: log.config?.imageModel || log.model || "",
-        quality: log.config?.quality || log.quality || "",
-        size: log.config?.size || log.size || "",
-        count: log.config?.count || String(log.imageCount || log.successCount || 1),
     };
 }
 

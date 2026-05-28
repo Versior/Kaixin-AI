@@ -605,6 +605,26 @@ func AIImageHistory(w http.ResponseWriter, r *http.Request) {
 	OK(w, result)
 }
 
+func AIImageHistoryBatchDelete(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var request struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		Fail(w, "参数错误")
+		return
+	}
+	if err := service.DeleteUserGenerationLogs(user.ID, request.IDs); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, map[string]bool{"success": true})
+}
+
 func normalizeImageRequest(path string, body []byte, contentType string) ([]byte, string) {
 	updatedBody, updatedType, err := normalizeImageRequestStrict(path, body, contentType)
 	if err != nil {
