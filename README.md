@@ -15,7 +15,7 @@
 - 视频创作：提示词和参考图生成视频，支持清晰度、尺寸、秒数配置。
 - 素材沉淀：我的素材、后台素材库、图片和视频媒体本地持久化。
 - 提示词库：同步多个 GitHub 图片提示词仓库，按分类展示案例。
-- 账号与算力点：账号密码注册、Linux.do 登录、算力点扣费、失败退点、注册 IP 限制。
+- 账号与算力点：账号密码注册、算力点扣费、失败退点、注册 IP 限制。
 - 全站队列：用户端展示全站生图任务、排队状态、统计排行和用户生图排行。
 - 管理后台：用户、算力点日志、模型渠道、提示词、素材、生成日志、系统公告和公开配置。
 
@@ -29,8 +29,8 @@
 ## 快速启动
 
 ```bash
-git clone git@github.com:basketikun/infinite-canvas.git
-cd infinite-canvas
+git clone git@github.com:Versior/Kaixin-AI.git
+cd Kaixin-AI
 cp .env.example .env
 docker compose up -d --build
 ```

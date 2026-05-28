@@ -3,8 +3,8 @@ import { App } from "antd";
 import { APP_VERSION } from "@/constant/env";
 import { parseChangelog, type ReleaseInfo } from "@/lib/release";
 
-const latestVersionUrl = "https://raw.githubusercontent.com/basketikun/infinite-canvas/main/VERSION";
-const latestChangelogUrl = "https://raw.githubusercontent.com/basketikun/infinite-canvas/main/CHANGELOG.md";
+const latestVersionUrl = "https://raw.githubusercontent.com/Versior/Kaixin-AI/main/VERSION";
+const latestChangelogUrl = "https://raw.githubusercontent.com/Versior/Kaixin-AI/main/CHANGELOG.md";
 
 function readLocalReleases(): ReleaseInfo[] {
     try {
@@ -15,8 +15,9 @@ function readLocalReleases(): ReleaseInfo[] {
 }
 
 function toVersionParts(version: string) {
-    const match = version.trim().match(/^v?(\d+)\.(\d+)\.(\d+)/);
-    return match ? match.slice(1).map(Number) : null;
+    const match = version.trim().match(/^v?(\d+)\.(\d+)\.(\d+)(?:-kaixin\.(\d+))?/i);
+    if (!match) return null;
+    return [...match.slice(1, 4).map(Number), Number(match[4] || 0)];
 }
 
 function isNewerVersion(latestVersion: string, currentVersion: string) {

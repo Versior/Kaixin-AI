@@ -22,6 +22,7 @@ export type AdminUser = {
     affCount: number;
     inviterId: string;
     linuxDoId: string;
+    registerIp: string;
     status: "active" | "ban";
     lastLoginAt: string;
     createdAt: string;

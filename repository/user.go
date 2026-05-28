@@ -18,7 +18,7 @@ func ListUsers(q model.Query) ([]model.User, int64, error) {
 	tx := db.Model(&model.User{})
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
-		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR linux_do_id LIKE ?", like, like, like, like)
+		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR register_ip LIKE ? OR linux_do_id LIKE ?", like, like, like, like, like)
 	}
 
 	var total int64
@@ -88,6 +88,31 @@ func SaveUser(user model.User) (model.User, error) {
 		return user, err
 	}
 	return user, db.Save(&user).Error
+}
+
+func SaveRegisteredUserIfIPAvailable(user model.User) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return user, false, err
+	}
+	registerIP := strings.TrimSpace(user.RegisterIP)
+	if registerIP == "" {
+		return user, false, nil
+	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		var total int64
+		if err := tx.Model(&model.User{}).Where("register_ip = ?", registerIP).Count(&total).Error; err != nil {
+			return err
+		}
+		if total > 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return tx.Save(&user).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return user, false, nil
+	}
+	return user, err == nil, err
 }
 
 func ConsumeUserCredits(id string, credits int, now string) (model.User, bool, error) {

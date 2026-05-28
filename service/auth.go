@@ -91,7 +91,7 @@ func Register(username string, password string, registerIP string) (model.AuthSe
 	if err != nil {
 		return model.AuthSession{}, err
 	}
-	user, err := repository.SaveUser(model.User{
+	user, saved, err := repository.SaveRegisteredUserIfIPAvailable(model.User{
 		ID:         newID("user"),
 		Username:   username,
 		Password:   hash,
@@ -105,6 +105,9 @@ func Register(username string, password string, registerIP string) (model.AuthSe
 	})
 	if err != nil {
 		return model.AuthSession{}, err
+	}
+	if !saved {
+		return model.AuthSession{}, safeMessageError{message: "同一 IP 只允许注册一个账号"}
 	}
 	_ = saveRegisterBonusCreditLog(user)
 	return newSession(user)

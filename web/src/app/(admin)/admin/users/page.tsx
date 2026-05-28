@@ -85,10 +85,10 @@ export default function AdminUsersPage() {
             render: (_, item) => <Typography.Text>{item.credits}</Typography.Text>,
         },
         {
-            title: "Linux.do",
-            dataIndex: "linuxDoId",
+            title: "注册 IP",
+            dataIndex: "registerIp",
             width: 140,
-            render: (_, item) => <Typography.Text type="secondary">{item.linuxDoId || "-"}</Typography.Text>,
+            render: (_, item) => <Typography.Text type="secondary">{item.registerIp || "-"}</Typography.Text>,
         },
         {
             title: "最近登录",
@@ -124,7 +124,7 @@ export default function AdminUsersPage() {
                                 <Form.Item label="关键词">
                                     <Input.Search
                                         value={keywordText}
-                                        placeholder="搜索用户名、昵称、邮箱或 Linux.do ID"
+                                        placeholder="搜索用户名、昵称、邮箱或注册 IP"
                                         allowClear
                                         enterButton={<SearchOutlined />}
                                         onSearch={() => searchUsers(keywordText)}

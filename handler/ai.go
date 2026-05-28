@@ -108,10 +108,10 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	credits *= batchCount
 	if isImageAIPath(path) {
 		if !allowImageBatchSubmission(user, batchCount, imageRequestLimitScope(r)) {
-			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, []byte(`{"msg":"图片生成太频繁，请 3 分钟内最多提交 3 次"}`), "rate_limited", "图片生成太频繁，请 3 分钟内最多提交 3 次")); err != nil {
+			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, []byte(`{"msg":"图片生成太频繁，请 3 分钟内最多生成 3 张"}`), "rate_limited", "图片生成太频繁，请 3 分钟内最多生成 3 张")); err != nil {
 				log.Printf("AI proxy save rate limit generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
 			}
-			Fail(w, "图片生成太频繁，请 3 分钟内最多提交 3 次")
+			Fail(w, "图片生成太频繁，请 3 分钟内最多生成 3 张")
 			return
 		}
 		kind := model.GenerationLogKindImage
@@ -342,9 +342,6 @@ func imageRequestLimitScope(r *http.Request) imageLimitScope {
 
 func allowImageBatchSubmission(user model.AuthUser, batchCount int, scopes ...imageLimitScope) bool {
 	if user.Role == model.UserRoleAdmin {
-		return true
-	}
-	if len(scopes) > 0 && scopes[0] == imageLimitScopeCanvas {
 		return true
 	}
 	if batchCount < 1 {

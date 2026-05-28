@@ -17,6 +17,13 @@ function getReleaseTitle(version: string) {
     return version === "Unreleased" ? "未发布" : version;
 }
 
+function getShortVersion(version: string) {
+    const kaixin = version.match(/kaixin\.(\d+)/i);
+    if (kaixin) return `k.${kaixin[1]}`;
+    const semver = version.match(/^v?(\d+)\.(\d+)\.(\d+)/);
+    return semver ? `v${semver[1]}.${semver[2]}.${semver[3]}` : version;
+}
+
 type VersionReleaseModalProps = {
     className?: string;
     style?: CSSProperties;
@@ -32,10 +39,10 @@ export function VersionReleaseModal({ className, style }: VersionReleaseModalPro
                 className={className || "shrink-0 cursor-pointer text-xs font-medium text-stone-500 transition hover:text-stone-950 dark:text-stone-400 dark:hover:text-white"}
                 style={style}
                 onClick={openReleaseModal}
-                title="查看版本更新"
+                title={`查看版本更新：${APP_VERSION}`}
             >
                 <span className="relative inline-flex">
-                    {APP_VERSION}
+                    {getShortVersion(APP_VERSION)}
                     {hasNewVersion ? <span className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-green-500" /> : null}
                 </span>
             </button>
