@@ -1,6 +1,8 @@
 package service
 
 import (
+	"strings"
+
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
 )
@@ -34,11 +36,17 @@ func CompleteGenerationTask(id string, ok bool, generationLogID string, errMessa
 	status := model.GenerationTaskStatusSucceeded
 	if !ok {
 		status = model.GenerationTaskStatusFailed
+	} else if isPartialSuccessError(errMessage) {
+		status = model.GenerationTaskStatusPartialSuccess
 	}
 	if generationLogID != "" {
 		_ = repository.LinkGenerationTaskArtifacts(id, "", generationLogID)
 	}
 	return repository.UpdateGenerationTaskStatus(id, status, "", now(), errMessage)
+}
+
+func isPartialSuccessError(errMessage string) bool {
+	return strings.Contains(errMessage, "少返回图片")
 }
 
 func CancelGenerationTask(id string, errMessage string) error {

@@ -110,6 +110,10 @@ func stringifyMessageContent(value any) string {
 	}
 }
 
+func ExtractImagesForAccounting(body []byte) []string {
+	return extractImages(body)
+}
+
 func extractImages(body []byte) []string {
 	var payload struct {
 		Data []map[string]any `json:"data"`

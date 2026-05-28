@@ -143,6 +143,11 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 }
 
 func executeAIProxyRequest(ctx context.Context, userID string, modelName string, path string, body []byte, contentType string, credits int, taskID string, w http.ResponseWriter) (string, []byte, string, bool) {
+	batchCount := readAIRequestCount(body, contentType)
+	creditPerImage := credits
+	if batchCount > 0 {
+		creditPerImage = credits / batchCount
+	}
 	channel, err := service.SelectModelChannel(modelName)
 	if err != nil {
 		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
@@ -164,9 +169,21 @@ func executeAIProxyRequest(ctx context.Context, userID string, modelName string,
 		return "failed", nil, err.Error(), true
 	}
 	status, responseBody, errMessage, failed := copyAIResponse(w, request)
-	if failed {
-		if err := service.RefundUserCreditsForTask(userID, modelName, credits, path, taskID); err != nil {
-			log.Printf("AI proxy refund credits failed: user=%s task=%s model=%s credits=%d err=%v", userID, taskID, modelName, credits, err)
+	usage := analyzeImageResponseUsage(path, responseBody, batchCount, creditPerImage)
+	if !failed {
+		status = usage.Status
+		if usage.Error != "" {
+			errMessage = usage.Error
+		}
+		failed = usage.Failed
+	}
+	refundCredits := credits
+	if !usage.Failed && usage.RefundCredits > 0 {
+		refundCredits = usage.RefundCredits
+	}
+	if failed || refundCredits > 0 {
+		if err := service.RefundUserCreditsForTask(userID, modelName, refundCredits, path, taskID); err != nil {
+			log.Printf("AI proxy refund credits failed: user=%s task=%s model=%s credits=%d err=%v", userID, taskID, modelName, refundCredits, err)
 		}
 	}
 	if taskID == "" {
@@ -175,6 +192,47 @@ func executeAIProxyRequest(ctx context.Context, userID string, modelName string,
 		}
 	}
 	return status, responseBody, errMessage, failed
+}
+
+type imageResponseUsage struct {
+	Status         string
+	Error          string
+	ActualImages   int
+	ChargedCredits int
+	RefundCredits  int
+	Partial        bool
+	Failed         bool
+}
+
+func analyzeImageResponseUsage(path string, responseBody []byte, requestedCount int, creditPerImage int) imageResponseUsage {
+	if requestedCount < 1 {
+		requestedCount = 1
+	}
+	if creditPerImage < 0 {
+		creditPerImage = 0
+	}
+	usage := imageResponseUsage{Status: "success", ActualImages: requestedCount, ChargedCredits: requestedCount * creditPerImage}
+	if !isImageAIPath(path) {
+		return usage
+	}
+	actualImages := len(service.ExtractImagesForAccounting(responseBody))
+	usage.ActualImages = actualImages
+	usage.ChargedCredits = actualImages * creditPerImage
+	missing := requestedCount - actualImages
+	if missing <= 0 {
+		return usage
+	}
+	usage.RefundCredits = missing * creditPerImage
+	if actualImages == 0 {
+		usage.Status = "failed"
+		usage.Failed = true
+		usage.Error = fmt.Sprintf("AI 上游未返回图片：请求 %d 张，实际返回 0 张", requestedCount)
+		return usage
+	}
+	usage.Status = "partial_success"
+	usage.Partial = true
+	usage.Error = fmt.Sprintf("AI 上游少返回图片：请求 %d 张，实际返回 %d 张，已自动退还 %d 点", requestedCount, actualImages, usage.RefundCredits)
+	return usage
 }
 
 func copyAIResponse(w http.ResponseWriter, request *http.Request) (string, []byte, string, bool) {

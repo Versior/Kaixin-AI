@@ -107,11 +107,12 @@ type CreditLogList struct {
 type GenerationTaskStatus string
 
 const (
-	GenerationTaskStatusQueued    GenerationTaskStatus = "queued"
-	GenerationTaskStatusRunning   GenerationTaskStatus = "running"
-	GenerationTaskStatusSucceeded GenerationTaskStatus = "succeeded"
-	GenerationTaskStatusFailed    GenerationTaskStatus = "failed"
-	GenerationTaskStatusCancelled GenerationTaskStatus = "cancelled"
+	GenerationTaskStatusQueued         GenerationTaskStatus = "queued"
+	GenerationTaskStatusRunning        GenerationTaskStatus = "running"
+	GenerationTaskStatusSucceeded      GenerationTaskStatus = "succeeded"
+	GenerationTaskStatusPartialSuccess GenerationTaskStatus = "partial_success"
+	GenerationTaskStatusFailed         GenerationTaskStatus = "failed"
+	GenerationTaskStatusCancelled      GenerationTaskStatus = "cancelled"
 )
 
 // GenerationTask links queue state, credit logs, and generation logs.
