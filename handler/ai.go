@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
 )
-
 
 func withPublicAPICORS(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -98,7 +98,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 	if isImageAIPath(path) {
-		if !allowImageSubmission(user.ID) {
+		if !allowImageSubmission(user) {
 			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, []byte(`{"msg":"图片生成太频繁，请 3 分钟内最多提交 3 次"}`), "rate_limited", "图片生成太频繁，请 3 分钟内最多提交 3 次")); err != nil {
 				log.Printf("AI proxy save rate limit generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
 			}
@@ -106,37 +106,44 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 	}
-	body, contentType = normalizeImageRequest(path, body, contentType)
-	credits *= readAIRequestCount(body, contentType)
-	channel, err := service.SelectModelChannel(modelName)
-	if err != nil {
-		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
-		Fail(w, "AI 接口请求失败："+err.Error())
-		return
-	}
-	request, err := http.NewRequest(http.MethodPost, service.BuildModelChannelURL(channel, path), bytes.NewReader(body))
-	if err != nil {
-		log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(channel, path), err)
-		Fail(w, "AI 接口请求失败："+err.Error())
-		return
-	}
-	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-	if contentType != "" {
-		request.Header.Set("Content-Type", contentType)
-	}
-	if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
-		FailError(w, err)
-		return
-	}
-	copyAIResponse(w, request, func() {
-		if err := service.RefundUserCredits(user.ID, modelName, credits, path); err != nil {
-			log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
+	run := func() {
+		body, contentType = normalizeImageRequest(path, body, contentType)
+		credits *= readAIRequestCount(body, contentType)
+		channel, err := service.SelectModelChannel(modelName)
+		if err != nil {
+			log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
+			Fail(w, "AI 接口请求失败："+err.Error())
+			return
 		}
-	}, func(status string, responseBody []byte, errMessage string) {
-		if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, responseBody, status, errMessage)); err != nil {
-			log.Printf("AI proxy save generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
+		request, err := http.NewRequest(http.MethodPost, service.BuildModelChannelURL(channel, path), bytes.NewReader(body))
+		if err != nil {
+			log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(channel, path), err)
+			Fail(w, "AI 接口请求失败："+err.Error())
+			return
 		}
-	})
+		request.Header.Set("Authorization", "Bearer "+channel.APIKey)
+		if contentType != "" {
+			request.Header.Set("Content-Type", contentType)
+		}
+		if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
+			FailError(w, err)
+			return
+		}
+		copyAIResponse(w, request, func() {
+			if err := service.RefundUserCredits(user.ID, modelName, credits, path); err != nil {
+				log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
+			}
+		}, func(status string, responseBody []byte, errMessage string) {
+			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, responseBody, status, errMessage)); err != nil {
+				log.Printf("AI proxy save generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
+			}
+		})
+	}
+	if isImageAIPath(path) {
+		globalImageTaskQueue.Run(user.ID, displayTaskUsername(user), modelName, run)
+		return
+	}
+	run()
 }
 
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), onDone func(status string, responseBody []byte, errMessage string)) {
@@ -238,12 +245,15 @@ var imageSubmissionLimiter = struct {
 	items map[string][]time.Time
 }{items: map[string][]time.Time{}}
 
-func allowImageSubmission(userID string) bool {
+func allowImageSubmission(user model.AuthUser) bool {
+	if user.Role == model.UserRoleAdmin {
+		return true
+	}
 	nowTime := time.Now()
 	windowStart := nowTime.Add(-3 * time.Minute)
 	imageSubmissionLimiter.Lock()
 	defer imageSubmissionLimiter.Unlock()
-	recent := imageSubmissionLimiter.items[userID]
+	recent := imageSubmissionLimiter.items[user.ID]
 	kept := recent[:0]
 	for _, item := range recent {
 		if item.After(windowStart) {
@@ -252,11 +262,118 @@ func allowImageSubmission(userID string) bool {
 	}
 	const maxImageSubmissionsPerWindow = 3
 	if len(kept) >= maxImageSubmissionsPerWindow {
-		imageSubmissionLimiter.items[userID] = kept
+		imageSubmissionLimiter.items[user.ID] = kept
 		return false
 	}
-	imageSubmissionLimiter.items[userID] = append(kept, nowTime)
+	imageSubmissionLimiter.items[user.ID] = append(kept, nowTime)
 	return true
+}
+
+func resetImageSubmissionLimiterForTest() {
+	imageSubmissionLimiter.Lock()
+	defer imageSubmissionLimiter.Unlock()
+	imageSubmissionLimiter.items = map[string][]time.Time{}
+}
+
+type imageTaskQueue struct {
+	tasks   chan imageTask
+	mu      sync.RWMutex
+	running *imageTaskInfo
+	waiting []imageTaskInfo
+}
+
+type imageTask struct {
+	info imageTaskInfo
+	run  func()
+	done chan struct{}
+}
+
+type imageTaskInfo struct {
+	ID                   string `json:"id"`
+	UserID               string `json:"userId"`
+	Username             string `json:"username"`
+	Model                string `json:"model"`
+	Status               string `json:"status"`
+	CreatedAt            string `json:"createdAt"`
+	StartedAt            string `json:"startedAt,omitempty"`
+	EstimatedWaitSeconds int    `json:"estimatedWaitSeconds"`
+}
+
+type imageTaskStatus struct {
+	Running *imageTaskInfo  `json:"running"`
+	Waiting []imageTaskInfo `json:"waiting"`
+}
+
+var globalImageTaskQueue = newImageTaskQueue()
+
+func newImageTaskQueue() *imageTaskQueue {
+	q := &imageTaskQueue{tasks: make(chan imageTask, 100)}
+	go q.worker()
+	return q
+}
+
+func (q *imageTaskQueue) Run(userID, username, modelName string, run func()) {
+	task := imageTask{info: imageTaskInfo{ID: fmt.Sprintf("task_%d", time.Now().UnixNano()), UserID: userID, Username: username, Model: modelName, Status: "waiting", CreatedAt: time.Now().UTC().Format(time.RFC3339)}, run: run, done: make(chan struct{})}
+	q.mu.Lock()
+	if q.running != nil || len(q.waiting) > 0 {
+		task.info.EstimatedWaitSeconds = (len(q.waiting) + 1) * 60
+	}
+	q.waiting = append(q.waiting, task.info)
+	q.mu.Unlock()
+	q.tasks <- task
+	<-task.done
+}
+
+func (q *imageTaskQueue) worker() {
+	for task := range q.tasks {
+		q.mu.Lock()
+		for i, item := range q.waiting {
+			if item.ID == task.info.ID {
+				q.waiting = append(q.waiting[:i], q.waiting[i+1:]...)
+				break
+			}
+		}
+		nowText := time.Now().UTC().Format(time.RFC3339)
+		task.info.Status = "running"
+		task.info.StartedAt = nowText
+		task.info.EstimatedWaitSeconds = 0
+		q.running = &task.info
+		q.mu.Unlock()
+		task.run()
+		q.mu.Lock()
+		q.running = nil
+		q.mu.Unlock()
+		close(task.done)
+	}
+}
+
+func (q *imageTaskQueue) Status() imageTaskStatus {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	waiting := append([]imageTaskInfo(nil), q.waiting...)
+	for i := range waiting {
+		waiting[i].EstimatedWaitSeconds = (i + 1) * 60
+	}
+	var running *imageTaskInfo
+	if q.running != nil {
+		value := *q.running
+		running = &value
+	}
+	return imageTaskStatus{Running: running, Waiting: waiting}
+}
+
+func displayTaskUsername(user model.AuthUser) string {
+	if strings.TrimSpace(user.DisplayName) != "" {
+		return strings.TrimSpace(user.DisplayName)
+	}
+	if strings.TrimSpace(user.Username) != "" {
+		return strings.TrimSpace(user.Username)
+	}
+	return "用户"
+}
+
+func AIImageTasks(w http.ResponseWriter, r *http.Request) {
+	OK(w, globalImageTaskQueue.Status())
 }
 
 func normalizeImageRequest(path string, body []byte, contentType string) ([]byte, string) {

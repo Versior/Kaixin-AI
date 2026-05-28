@@ -16,6 +16,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
+import { fetchImageTaskStatus, type ImageTaskStatus } from "@/services/api/image-tasks";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import type { ReferenceImage } from "@/types/image";
@@ -88,6 +89,7 @@ export default function ImagePage() {
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [taskStatus, setTaskStatus] = useState<ImageTaskStatus>({ running: null, waiting: [] });
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
@@ -101,6 +103,24 @@ export default function ImagePage() {
 
     useEffect(() => {
         void refreshLogs();
+    }, []);
+
+    useEffect(() => {
+        let alive = true;
+        const refresh = async () => {
+            try {
+                const status = await fetchImageTaskStatus();
+                if (alive) setTaskStatus(status);
+            } catch {
+                if (alive) setTaskStatus({ running: null, waiting: [] });
+            }
+        };
+        void refresh();
+        const timer = window.setInterval(refresh, 3000);
+        return () => {
+            alive = false;
+            window.clearInterval(timer);
+        };
     }, []);
 
     const addReferences = async (files?: FileList | null) => {
@@ -429,11 +449,12 @@ export default function ImagePage() {
                                 )}
                             </div>
                         ) : (
-                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
+                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[360px]">
                                 <ImagePlus className="mb-4 size-11 text-stone-400" />
                                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有生成图片" />
                             </div>
                         )}
+                        <GlobalImageTaskPanel status={taskStatus} />
                     </div>
                 </section>
             </main>
@@ -486,6 +507,41 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
                 <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" maxCount={10} />
             </div>
         </>
+    );
+}
+
+function GlobalImageTaskPanel({ status }: { status: ImageTaskStatus }) {
+    const hasTasks = Boolean(status.running) || status.waiting.length > 0;
+    return (
+        <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50/70 p-4 dark:border-stone-800 dark:bg-stone-900/50">
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <div className="text-sm font-semibold">全站生图任务</div>
+                    <div className="text-xs text-stone-500 dark:text-stone-400">多人同时提交会自动排队，只显示用户与等待时间</div>
+                </div>
+                <Tag className="m-0">{hasTasks ? `${(status.running ? 1 : 0) + status.waiting.length} 个任务` : "空闲"}</Tag>
+            </div>
+            {status.running ? (
+                <div className="mb-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <span className="font-medium">{status.running.username}</span>
+                    <span className="ml-2 text-stone-500 dark:text-stone-400">正在生图</span>
+                </div>
+            ) : null}
+            {status.waiting.length ? (
+                <div className="space-y-2">
+                    {status.waiting.slice(0, 5).map((task, index) => (
+                        <div key={task.id} className="flex items-center justify-between rounded-md border border-stone-200 bg-background px-3 py-2 text-sm dark:border-stone-800">
+                            <span>
+                                {index + 1}. {task.username}
+                            </span>
+                            <span className="text-stone-500 dark:text-stone-400">预计等待 {formatDuration(task.estimatedWaitSeconds * 1000)}</span>
+                        </div>
+                    ))}
+                </div>
+            ) : !status.running ? (
+                <div className="rounded-md border border-dashed border-stone-300 px-3 py-6 text-center text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">暂无排队任务</div>
+            ) : null}
+        </div>
     );
 }
 
