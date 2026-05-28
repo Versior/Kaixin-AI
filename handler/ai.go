@@ -350,7 +350,7 @@ func (q *imageTaskQueue) worker() {
 func (q *imageTaskQueue) Status() imageTaskStatus {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	waiting := append([]imageTaskInfo(nil), q.waiting...)
+	waiting := append([]imageTaskInfo{}, q.waiting...)
 	for i := range waiting {
 		waiting[i].EstimatedWaitSeconds = (i + 1) * 60
 	}
