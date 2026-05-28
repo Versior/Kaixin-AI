@@ -21,6 +21,19 @@ func ListGenerationLogs(q model.Query) (model.GenerationLogList, error) {
 	return model.GenerationLogList{Items: items, Total: int(total)}, nil
 }
 
+func ListUserGenerationLogs(userID string, q model.Query) (model.GenerationLogList, error) {
+	items, total, err := repository.ListUserGenerationLogs(userID, q)
+	if err != nil {
+		return model.GenerationLogList{}, err
+	}
+	for i := range items {
+		items[i].Request = ""
+		items[i].Response = ""
+		items[i].Images = compactLogImages(items[i].Images)
+	}
+	return model.GenerationLogList{Items: items, Total: int(total)}, nil
+}
+
 func compactLogImages(images []string) []string {
 	if len(images) == 0 {
 		return images

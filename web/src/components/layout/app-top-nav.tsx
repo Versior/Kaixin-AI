@@ -26,7 +26,8 @@ export function AppTopNav() {
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
     const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
-    const slug = pathname.split("/").filter(Boolean)[0];
+    const slugParts = pathname.split("/").filter(Boolean);
+    const slug = slugParts[0] === "image" && slugParts[1] === "history" ? "image/history" : slugParts[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
 
     return (
