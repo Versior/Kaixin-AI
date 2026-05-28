@@ -226,6 +226,13 @@ export type AdminPublicSettings = {
             enabled: boolean;
         };
     };
+    announcement: {
+        enabled: boolean;
+        title: string;
+        content: string;
+        version: string;
+        oncePerVersion: boolean;
+    };
 };
 
 export type AdminPrivateSettings = {

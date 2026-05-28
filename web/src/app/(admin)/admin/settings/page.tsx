@@ -37,6 +37,7 @@ const emptySettings: AdminSettings = {
             allowCustomChannel: true,
         },
         auth: { allowRegister: true, linuxDo: { enabled: false } },
+        announcement: { enabled: false, title: "网站公告", content: "", version: "default", oncePerVersion: true },
     },
     private: { channels: [], promptSync: { enabled: true, cron: "*/5 * * * *" }, auth: { linuxDo: { clientId: "", clientSecret: "" } } },
 };
@@ -450,6 +451,37 @@ export default function AdminSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
+                                        <Card size="small" title="网站公告弹窗">
+                                            <Row gutter={16}>
+                                                <Col xs={24} md={6}>
+                                                    <Form.Item name={["public", "announcement", "enabled"]} label="开启公告" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} md={9}>
+                                                    <Form.Item name={["public", "announcement", "title"]} label="公告标题">
+                                                        <Input placeholder="网站公告" />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} md={9}>
+                                                    <Form.Item name={["public", "announcement", "version"]} label="公告版本" extra="版本变化后会重新弹出">
+                                                        <Input placeholder="例如 2026-05-28" />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col span={24}>
+                                                    <Form.Item name={["public", "announcement", "content"]} label="公告内容">
+                                                        <Input.TextArea rows={4} placeholder="输入进入网站后弹出的公告内容" />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col span={24}>
+                                                    <Form.Item name={["public", "announcement", "oncePerVersion"]} label="同版本只弹一次" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                            </Row>
+                                        </Card>
+                                    </Col>
+                                    <Col span={24}>
                                         <Typography.Title level={5}>模型算力点</Typography.Title>
                                         <Table
                                             rowKey="model"
@@ -840,6 +872,13 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
             linuxDo: {
                 enabled: setting.auth?.linuxDo?.enabled === true,
             },
+        },
+        announcement: {
+            enabled: setting.announcement?.enabled === true,
+            title: setting.announcement?.title || "网站公告",
+            content: setting.announcement?.content || "",
+            version: setting.announcement?.version || "default",
+            oncePerVersion: setting.announcement?.oncePerVersion !== false,
         },
     };
 }

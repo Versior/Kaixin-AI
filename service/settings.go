@@ -82,6 +82,11 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
 	}
+	setting.Announcement.Title = strings.TrimSpace(setting.Announcement.Title)
+	setting.Announcement.Version = strings.TrimSpace(setting.Announcement.Version)
+	if setting.Announcement.Version == "" {
+		setting.Announcement.Version = "default"
+	}
 	return setting
 }
 

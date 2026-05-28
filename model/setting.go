@@ -39,10 +39,19 @@ type PublicModelChannelSetting struct {
 	AllowCustomChannel *bool       `json:"allowCustomChannel"`
 }
 
+type AnnouncementSetting struct {
+	Enabled        bool   `json:"enabled"`
+	Title          string `json:"title"`
+	Content        string `json:"content"`
+	Version        string `json:"version"`
+	OncePerVersion bool   `json:"oncePerVersion"`
+}
+
 // PublicSetting 公开配置。
 type PublicSetting struct {
 	ModelChannel PublicModelChannelSetting `json:"modelChannel"`
 	Auth         PublicAuthSetting         `json:"auth"`
+	Announcement AnnouncementSetting       `json:"announcement"`
 }
 
 type PublicAuthSetting struct {
