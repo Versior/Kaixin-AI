@@ -5,6 +5,7 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 
 import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
+import { userScopedStorageKey } from "@/lib/user-scoped-storage";
 import { cleanupUnusedImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
 
@@ -36,21 +37,10 @@ type AssetStore = {
 };
 
 const ASSET_STORE_KEY = "infinite-canvas:asset_store";
-const activeUserScopedKey = (name: string) => {
-    if (typeof window === "undefined") return name;
-    try {
-        const auth = JSON.parse(window.localStorage.getItem("infinite-canvas:auth_token") || "{}");
-        const token = auth?.state?.token || "guest";
-        const payload = token && token !== "guest" ? JSON.parse(window.atob(token.split(".")[1] || "")) : null;
-        return `${name}:${payload?.userId || "guest"}`;
-    } catch {
-        return `${name}:guest`;
-    }
-};
 
 const assetStorage: PersistStorage<AssetStore> = {
     getItem: async (name) => {
-        const value = await localForageStorage.getItem(activeUserScopedKey(name));
+        const value = await localForageStorage.getItem(userScopedStorageKey(name));
         if (!value) return null;
         const parsed = JSON.parse(value) as StorageValue<AssetStore>;
         parsed.state.assets = await Promise.all(
@@ -70,8 +60,8 @@ const assetStorage: PersistStorage<AssetStore> = {
         );
         return parsed;
     },
-    setItem: (name, value) => localForageStorage.setItem(activeUserScopedKey(name), JSON.stringify(value)),
-    removeItem: (name) => localForageStorage.removeItem(activeUserScopedKey(name)),
+    setItem: (name, value) => localForageStorage.setItem(userScopedStorageKey(name), JSON.stringify(value)),
+    removeItem: (name) => localForageStorage.removeItem(userScopedStorageKey(name)),
 };
 
 export const useAssetStore = create<AssetStore>()(

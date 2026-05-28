@@ -45,6 +45,12 @@ func DB() (*gorm.DB, error) {
 		if dbErr != nil {
 			return
 		}
+		if driver == "sqlite" {
+			dbErr = db.Exec("PRAGMA foreign_keys = ON").Error
+			if dbErr != nil {
+				return
+			}
+		}
 		dbErr = db.AutoMigrate(
 			&model.User{},
 			&model.CreditLog{},

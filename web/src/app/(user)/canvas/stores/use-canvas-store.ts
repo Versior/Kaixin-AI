@@ -3,6 +3,7 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 
 import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
+import { userScopedStorageKey } from "@/lib/user-scoped-storage";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "../types";
 
@@ -33,24 +34,13 @@ type CanvasStore = {
 
 const initialViewport: ViewportTransform = { x: 0, y: 0, k: 1 };
 const CANVAS_STORE_KEY = "infinite-canvas:canvas_store";
-const activeUserScopedKey = (name: string) => {
-    if (typeof window === "undefined") return name;
-    try {
-        const auth = JSON.parse(window.localStorage.getItem("infinite-canvas:auth_token") || "{}");
-        const token = auth?.state?.token || "guest";
-        const payload = token && token !== "guest" ? JSON.parse(window.atob(token.split(".")[1] || "")) : null;
-        return `${name}:${payload?.userId || "guest"}`;
-    } catch {
-        return `${name}:guest`;
-    }
-};
 type PersistedCanvasState = Pick<CanvasStore, "projects">;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let queuedPersistState: PersistedCanvasState | null = null;
 
 const canvasStorage: PersistStorage<CanvasStore> = {
     getItem: async (name) => {
-        const value = await localForageStorage.getItem(activeUserScopedKey(name));
+        const value = await localForageStorage.getItem(userScopedStorageKey(name));
         if (!value) return null;
         const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
         queuedPersistState = parsed.state as PersistedCanvasState;
@@ -63,10 +53,10 @@ const canvasStorage: PersistStorage<CanvasStore> = {
         if (saveTimer) clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
             saveTimer = null;
-            void localForageStorage.setItem(activeUserScopedKey(name), JSON.stringify(value));
+            void localForageStorage.setItem(userScopedStorageKey(name), JSON.stringify(value));
         }, 400);
     },
-    removeItem: (name) => localForageStorage.removeItem(activeUserScopedKey(name)),
+    removeItem: (name) => localForageStorage.removeItem(userScopedStorageKey(name)),
 };
 
 export const useCanvasStore = create<CanvasStore>()(

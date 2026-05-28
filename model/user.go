@@ -88,6 +88,7 @@ const (
 type CreditLog struct {
 	ID        string        `json:"id" gorm:"primaryKey"`
 	UserID    string        `json:"userId" gorm:"index"`
+	User      User          `json:"-" gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 	Username  string        `json:"username" gorm:"->;column:username"`
 	Type      CreditLogType `json:"type"`
 	Amount    int           `json:"amount"`
