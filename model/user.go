@@ -104,6 +104,36 @@ type CreditLogList struct {
 	Total int         `json:"total"`
 }
 
+type GenerationTaskStatus string
+
+const (
+	GenerationTaskStatusQueued    GenerationTaskStatus = "queued"
+	GenerationTaskStatusRunning   GenerationTaskStatus = "running"
+	GenerationTaskStatusSucceeded GenerationTaskStatus = "succeeded"
+	GenerationTaskStatusFailed    GenerationTaskStatus = "failed"
+	GenerationTaskStatusCancelled GenerationTaskStatus = "cancelled"
+)
+
+// GenerationTask links queue state, credit logs, and generation logs.
+type GenerationTask struct {
+	ID              string               `json:"id" gorm:"primaryKey"`
+	UserID          string               `json:"userId" gorm:"index"`
+	User            User                 `json:"-" gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
+	Username        string               `json:"username" gorm:"->;column:username"`
+	Kind            GenerationLogKind    `json:"kind" gorm:"index"`
+	Model           string               `json:"model" gorm:"index"`
+	Path            string               `json:"path"`
+	BatchCount      int                  `json:"batchCount"`
+	Credits         int                  `json:"credits"`
+	Status          GenerationTaskStatus `json:"status" gorm:"index"`
+	Error           string               `json:"error" gorm:"type:text"`
+	CreatedAt       string               `json:"createdAt"`
+	StartedAt       string               `json:"startedAt"`
+	CompletedAt     string               `json:"completedAt"`
+	CreditLogID     string               `json:"creditLogId"`
+	GenerationLogID string               `json:"generationLogId"`
+}
+
 type GenerationLogKind string
 
 const (
@@ -113,6 +143,7 @@ const (
 
 type GenerationLog struct {
 	ID        string            `json:"id" gorm:"primaryKey"`
+	TaskID    string            `json:"taskId" gorm:"index"`
 	UserID    string            `json:"userId" gorm:"index"`
 	Username  string            `json:"username" gorm:"->;column:username"`
 	Kind      GenerationLogKind `json:"kind" gorm:"index"`

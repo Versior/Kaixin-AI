@@ -170,8 +170,8 @@ function withSystemMessage(config: AiConfig, messages: ChatCompletionMessage[]) 
     return systemPrompt ? [{ role: "system" as const, content: systemPrompt }, ...messages] : messages;
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string) {
-    const n = 1;
+export async function requestGeneration(config: AiConfig, prompt: string, count = 1) {
+    const n = Math.max(1, Math.min(3, Math.floor(Number(count) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     try {
@@ -197,8 +197,8 @@ export async function requestGeneration(config: AiConfig, prompt: string) {
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[]) {
-    const n = 1;
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], count = 1) {
+    const n = Math.max(1, Math.min(3, Math.floor(Number(count) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const formData = new FormData();

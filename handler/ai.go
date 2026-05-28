@@ -2,7 +2,9 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -76,7 +78,7 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-	copyAIResponse(w, request, nil, nil)
+	copyAIResponse(w, request)
 }
 
 func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
@@ -97,67 +99,90 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		Fail(w, "AI 接口请求失败："+err.Error())
 		return
 	}
+	batchCount := readAIRequestCount(body, contentType)
+	body, contentType = normalizeImageRequest(path, body, contentType)
+	credits *= batchCount
 	if isImageAIPath(path) {
-		if !allowImageSubmission(user) {
+		if !allowImageBatchSubmission(user, batchCount) {
 			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, []byte(`{"msg":"图片生成太频繁，请 3 分钟内最多提交 3 次"}`), "rate_limited", "图片生成太频繁，请 3 分钟内最多提交 3 次")); err != nil {
 				log.Printf("AI proxy save rate limit generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
 			}
 			Fail(w, "图片生成太频繁，请 3 分钟内最多提交 3 次")
 			return
 		}
-	}
-	run := func() {
-		body, contentType = normalizeImageRequest(path, body, contentType)
-		credits *= readAIRequestCount(body, contentType)
-		channel, err := service.SelectModelChannel(modelName)
+		kind := model.GenerationLogKindImage
+		task, err := service.CreateGenerationTask(user.ID, kind, modelName, path, batchCount, credits)
 		if err != nil {
-			log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
-			Fail(w, "AI 接口请求失败："+err.Error())
-			return
-		}
-		request, err := http.NewRequest(http.MethodPost, service.BuildModelChannelURL(channel, path), bytes.NewReader(body))
-		if err != nil {
-			log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(channel, path), err)
-			Fail(w, "AI 接口请求失败："+err.Error())
-			return
-		}
-		request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-		if contentType != "" {
-			request.Header.Set("Content-Type", contentType)
-		}
-		if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
 			FailError(w, err)
 			return
 		}
-		copyAIResponse(w, request, func() {
-			if err := service.RefundUserCredits(user.ID, modelName, credits, path); err != nil {
-				log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
+		taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayTaskUsername(user), modelName, batchCount, func(ctx context.Context) imageTaskResult {
+			_ = service.MarkGenerationTaskRunning(task.ID)
+			status, responseBody, errMessage, failed := executeAIProxyRequest(ctx, user.ID, modelName, path, body, contentType, credits, task.ID, w)
+			logID := ""
+			if saved, err := service.SaveGenerationLog(service.BuildGenerationLogForTask(task.ID, user.ID, path, modelName, body, responseBody, status, errMessage)); err != nil {
+				log.Printf("AI proxy save generation log failed: user=%s task=%s model=%s err=%v", user.ID, task.ID, modelName, err)
+			} else {
+				logID = saved.ID
 			}
-		}, func(status string, responseBody []byte, errMessage string) {
-			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, responseBody, status, errMessage)); err != nil {
-				log.Printf("AI proxy save generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
-			}
+			_ = service.CompleteGenerationTask(task.ID, !failed, logID, errMessage)
+			return imageTaskResult{Status: status, Error: errMessage}
 		})
-	}
-	if isImageAIPath(path) {
-		globalImageTaskQueue.Run(user.ID, displayTaskUsername(user), modelName, run)
+		if err != nil {
+			_ = service.CancelGenerationTask(task.ID, err.Error())
+			Fail(w, err.Error())
+			return
+		}
+		if taskID != task.ID {
+			log.Printf("image queue task id mismatch: db=%s queue=%s", task.ID, taskID)
+		}
+		globalImageTaskQueue.Wait(task.ID)
 		return
 	}
-	run()
+	executeAIProxyRequest(r.Context(), user.ID, modelName, path, body, contentType, credits, "", w)
 }
 
-func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), onDone func(status string, responseBody []byte, errMessage string)) {
+func executeAIProxyRequest(ctx context.Context, userID string, modelName string, path string, body []byte, contentType string, credits int, taskID string, w http.ResponseWriter) (string, []byte, string, bool) {
+	channel, err := service.SelectModelChannel(modelName)
+	if err != nil {
+		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
+		Fail(w, "AI 接口请求失败："+err.Error())
+		return "failed", nil, err.Error(), true
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, service.BuildModelChannelURL(channel, path), bytes.NewReader(body))
+	if err != nil {
+		log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(channel, path), err)
+		Fail(w, "AI 接口请求失败："+err.Error())
+		return "failed", nil, err.Error(), true
+	}
+	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+	if err := service.ConsumeUserCreditsForTask(userID, modelName, credits, path, taskID); err != nil {
+		FailError(w, err)
+		return "failed", nil, err.Error(), true
+	}
+	status, responseBody, errMessage, failed := copyAIResponse(w, request)
+	if failed {
+		if err := service.RefundUserCreditsForTask(userID, modelName, credits, path, taskID); err != nil {
+			log.Printf("AI proxy refund credits failed: user=%s task=%s model=%s credits=%d err=%v", userID, taskID, modelName, credits, err)
+		}
+	}
+	if taskID == "" {
+		if _, err := service.SaveGenerationLog(service.BuildGenerationLog(userID, path, modelName, body, responseBody, status, errMessage)); err != nil {
+			log.Printf("AI proxy save generation log failed: user=%s model=%s err=%v", userID, modelName, err)
+		}
+	}
+	return status, responseBody, errMessage, failed
+}
+
+func copyAIResponse(w http.ResponseWriter, request *http.Request) (string, []byte, string, bool) {
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		log.Printf("AI proxy request failed: url=%s err=%v", request.URL.String(), err)
-		if onFailure != nil {
-			onFailure()
-		}
-		if onDone != nil {
-			onDone("network_error", nil, err.Error())
-		}
 		Fail(w, "AI 接口请求失败："+err.Error())
-		return
+		return "network_error", nil, err.Error(), true
 	}
 	defer response.Body.Close()
 
@@ -165,31 +190,16 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 		message := aiUpstreamErrorMessage(response.StatusCode, payload)
 		log.Printf("AI upstream error: url=%s status=%d body=%s", request.URL.String(), response.StatusCode, strings.TrimSpace(string(payload)))
-		if onFailure != nil {
-			onFailure()
-		}
-		if onDone != nil {
-			onDone("failed", payload, message)
-		}
 		Fail(w, message)
-		return
+		return "failed", payload, message, true
 	}
 
 	payload, readErr := io.ReadAll(response.Body)
 	if readErr != nil {
-		if onFailure != nil {
-			onFailure()
-		}
-		if onDone != nil {
-			onDone("read_error", nil, readErr.Error())
-		}
 		Fail(w, "AI 接口请求失败："+readErr.Error())
-		return
+		return "read_error", nil, readErr.Error(), true
 	}
 	payload = rewritePublicImageURLs(payload)
-	if onDone != nil {
-		onDone("success", payload, "")
-	}
 
 	for key, values := range response.Header {
 		if strings.EqualFold(key, "Content-Length") {
@@ -201,6 +211,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 	}
 	w.WriteHeader(response.StatusCode)
 	_, _ = w.Write(payload)
+	return "success", payload, "", false
 }
 
 func aiUpstreamErrorMessage(statusCode int, payload []byte) string {
@@ -246,8 +257,18 @@ var imageSubmissionLimiter = struct {
 }{items: map[string][]time.Time{}}
 
 func allowImageSubmission(user model.AuthUser) bool {
+	return allowImageBatchSubmission(user, 1)
+}
+
+func allowImageBatchSubmission(user model.AuthUser, batchCount int) bool {
 	if user.Role == model.UserRoleAdmin {
 		return true
+	}
+	if batchCount < 1 {
+		batchCount = 1
+	}
+	if batchCount > 3 {
+		return false
 	}
 	nowTime := time.Now()
 	windowStart := nowTime.Add(-3 * time.Minute)
@@ -276,16 +297,25 @@ func resetImageSubmissionLimiterForTest() {
 }
 
 type imageTaskQueue struct {
-	tasks   chan imageTask
-	mu      sync.RWMutex
-	running *imageTaskInfo
-	waiting []imageTaskInfo
+	tasks    chan imageTask
+	mu       sync.RWMutex
+	running  *imageTaskInfo
+	waiting  []imageTaskInfo
+	recent   []imageTaskInfo
+	done     map[string]chan struct{}
+	capacity int
 }
 
 type imageTask struct {
 	info imageTaskInfo
-	run  func()
+	ctx  context.Context
+	run  func(context.Context) imageTaskResult
 	done chan struct{}
+}
+
+type imageTaskResult struct {
+	Status string
+	Error  string
 }
 
 type imageTaskInfo struct {
@@ -296,42 +326,116 @@ type imageTaskInfo struct {
 	Status               string `json:"status"`
 	CreatedAt            string `json:"createdAt"`
 	StartedAt            string `json:"startedAt,omitempty"`
+	CompletedAt          string `json:"completedAt,omitempty"`
 	EstimatedWaitSeconds int    `json:"estimatedWaitSeconds"`
+	BatchCount           int    `json:"batchCount"`
+	Error                string `json:"error,omitempty"`
 }
 
 type imageTaskStatus struct {
 	Running *imageTaskInfo  `json:"running"`
 	Waiting []imageTaskInfo `json:"waiting"`
+	Recent  []imageTaskInfo `json:"recent"`
 }
 
 var globalImageTaskQueue = newImageTaskQueue()
+var errImageTaskQueueFull = errors.New("全站生图队列已满，请稍后再试")
 
-func newImageTaskQueue() *imageTaskQueue {
-	q := &imageTaskQueue{tasks: make(chan imageTask, 100)}
+func newImageTaskQueue() *imageTaskQueue { return newImageTaskQueueWithCapacity(100) }
+
+func newImageTaskQueueWithCapacity(capacity int) *imageTaskQueue {
+	if capacity < 1 {
+		capacity = 1
+	}
+	q := &imageTaskQueue{tasks: make(chan imageTask, capacity), capacity: capacity, done: map[string]chan struct{}{}}
 	go q.worker()
 	return q
 }
 
-func (q *imageTaskQueue) Run(userID, username, modelName string, run func()) {
-	task := imageTask{info: imageTaskInfo{ID: fmt.Sprintf("task_%d", time.Now().UnixNano()), UserID: userID, Username: username, Model: modelName, Status: "waiting", CreatedAt: time.Now().UTC().Format(time.RFC3339)}, run: run, done: make(chan struct{})}
+func (q *imageTaskQueue) Submit(ctx context.Context, userID, username, modelName string, batchCount int, run func(context.Context) imageTaskResult) (string, error) {
+	return q.SubmitWithID(ctx, fmt.Sprintf("task_%d", time.Now().UnixNano()), userID, username, modelName, batchCount, run)
+}
+
+func (q *imageTaskQueue) SubmitWithID(ctx context.Context, taskID, userID, username, modelName string, batchCount int, run func(context.Context) imageTaskResult) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if batchCount < 1 {
+		batchCount = 1
+	}
+	if strings.TrimSpace(taskID) == "" {
+		taskID = fmt.Sprintf("task_%d", time.Now().UnixNano())
+	}
+	task := imageTask{info: imageTaskInfo{ID: taskID, UserID: userID, Username: username, Model: modelName, Status: "waiting", CreatedAt: time.Now().UTC().Format(time.RFC3339), BatchCount: batchCount}, ctx: ctx, run: run, done: make(chan struct{})}
 	q.mu.Lock()
 	if q.running != nil || len(q.waiting) > 0 {
 		task.info.EstimatedWaitSeconds = (len(q.waiting) + 1) * 60
 	}
+	if len(q.waiting) >= q.capacity {
+		q.mu.Unlock()
+		return "", errImageTaskQueueFull
+	}
 	q.waiting = append(q.waiting, task.info)
+	q.done[task.info.ID] = task.done
 	q.mu.Unlock()
-	q.tasks <- task
-	<-task.done
+	select {
+	case q.tasks <- task:
+		go q.cancelWaitingOnContext(task.info.ID, ctx)
+		return task.info.ID, nil
+	default:
+		q.cancelTask(task.info.ID, "queue_full")
+		return "", errImageTaskQueueFull
+	}
+}
+
+func (q *imageTaskQueue) Wait(id string) {
+	q.mu.RLock()
+	done := q.done[id]
+	q.mu.RUnlock()
+	if done != nil {
+		<-done
+	}
+}
+
+func (q *imageTaskQueue) cancelWaitingOnContext(id string, ctx context.Context) {
+	<-ctx.Done()
+	q.cancelTask(id, "cancelled")
+}
+
+func (q *imageTaskQueue) cancelTask(id string, reason string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for i, item := range q.waiting {
+		if item.ID == id {
+			q.waiting = append(q.waiting[:i], q.waiting[i+1:]...)
+			item.Status = "cancelled"
+			item.Error = reason
+			item.CompletedAt = time.Now().UTC().Format(time.RFC3339)
+			q.addRecentLocked(item)
+			if done := q.done[id]; done != nil {
+				close(done)
+				delete(q.done, id)
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func (q *imageTaskQueue) worker() {
 	for task := range q.tasks {
 		q.mu.Lock()
+		cancelled := true
 		for i, item := range q.waiting {
 			if item.ID == task.info.ID {
 				q.waiting = append(q.waiting[:i], q.waiting[i+1:]...)
+				cancelled = false
 				break
 			}
+		}
+		if cancelled {
+			q.mu.Unlock()
+			continue
 		}
 		nowText := time.Now().UTC().Format(time.RFC3339)
 		task.info.Status = "running"
@@ -339,11 +443,29 @@ func (q *imageTaskQueue) worker() {
 		task.info.EstimatedWaitSeconds = 0
 		q.running = &task.info
 		q.mu.Unlock()
-		task.run()
+		result := task.run(task.ctx)
 		q.mu.Lock()
+		completed := task.info
+		completed.Status = result.Status
+		if completed.Status == "" {
+			completed.Status = "success"
+		}
+		completed.Error = result.Error
+		completed.CompletedAt = time.Now().UTC().Format(time.RFC3339)
 		q.running = nil
+		q.addRecentLocked(completed)
+		if done := q.done[task.info.ID]; done != nil {
+			close(done)
+			delete(q.done, task.info.ID)
+		}
 		q.mu.Unlock()
-		close(task.done)
+	}
+}
+
+func (q *imageTaskQueue) addRecentLocked(item imageTaskInfo) {
+	q.recent = append([]imageTaskInfo{item}, q.recent...)
+	if len(q.recent) > 20 {
+		q.recent = q.recent[:20]
 	}
 }
 
@@ -359,7 +481,8 @@ func (q *imageTaskQueue) Status() imageTaskStatus {
 		value := *q.running
 		running = &value
 	}
-	return imageTaskStatus{Running: running, Waiting: waiting}
+	recent := append([]imageTaskInfo{}, q.recent...)
+	return imageTaskStatus{Running: running, Waiting: waiting, Recent: recent}
 }
 
 func displayTaskUsername(user model.AuthUser) string {

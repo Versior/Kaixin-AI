@@ -26,6 +26,7 @@ export default function AdminGenerationLogsPage() {
 
     const columns: ProColumns<AdminGenerationLog>[] = [
         { title: "预览", dataIndex: "images", width: 92, render: (_, item) => item.images?.[0] ? <Image src={previewUrl(item.images[0])} alt={item.prompt || item.id} width={44} height={34} style={{ objectFit: "cover", borderRadius: 6 }} preview={{ mask: "放大" }} fallback="" /> : <Typography.Text type="secondary">无预览</Typography.Text> },
+        { title: "任务ID", dataIndex: "taskId", width: 128, render: (_, item) => <Typography.Text copyable ellipsis>{item.taskId || "-"}</Typography.Text> },
         { title: "用户名", dataIndex: "username", width: 180, render: (_, item) => <Typography.Text copyable ellipsis>{item.username || "-"}</Typography.Text> },
         { title: "类型", dataIndex: "kind", width: 90, render: (_, item) => <Tag color={item.kind === "image" ? "purple" : "blue"}>{item.kind === "image" ? "图片" : "对话"}</Tag> },
         { title: "模型", dataIndex: "model", width: 180, render: (_, item) => <Typography.Text ellipsis>{item.model}</Typography.Text> },

@@ -358,16 +358,22 @@ func AdjustUserCredits(id string, credits int) (model.User, error) {
 }
 
 func ConsumeUserCredits(userID string, modelName string, credits int, path string) error {
+	return ConsumeUserCreditsForTask(userID, modelName, credits, path, "")
+}
+
+func ConsumeUserCreditsForTask(userID string, modelName string, credits int, path string, taskID string) error {
 	if credits <= 0 {
 		return nil
 	}
-	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path})
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "taskId": taskID})
 	nowText := now()
+	creditLogID := newID("credit")
 	_, ok, err := repository.ConsumeUserCreditsWithLog(userID, credits, nowText, model.CreditLog{
-		ID:        newID("credit"),
+		ID:        creditLogID,
 		UserID:    userID,
 		Type:      model.CreditLogTypeAIConsume,
 		Amount:    -credits,
+		RelatedID: taskID,
 		Remark:    "调用模型 " + modelName,
 		Extra:     string(extra),
 		CreatedAt: nowText,
@@ -378,20 +384,28 @@ func ConsumeUserCredits(userID string, modelName string, credits int, path strin
 	if !ok {
 		return safeMessageError{message: "算力点不足"}
 	}
+	if taskID != "" {
+		_ = repository.LinkGenerationTaskArtifacts(taskID, creditLogID, "")
+	}
 	return nil
 }
 
 func RefundUserCredits(userID string, modelName string, credits int, path string) error {
+	return RefundUserCreditsForTask(userID, modelName, credits, path, "")
+}
+
+func RefundUserCreditsForTask(userID string, modelName string, credits int, path string, taskID string) error {
 	if credits <= 0 {
 		return nil
 	}
-	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path})
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "taskId": taskID})
 	nowText := now()
 	_, ok, err := repository.RefundUserCreditsWithLog(userID, credits, nowText, model.CreditLog{
 		ID:        newID("credit"),
 		UserID:    userID,
 		Type:      model.CreditLogTypeAIRefund,
 		Amount:    credits,
+		RelatedID: taskID,
 		Remark:    "模型调用失败返还 " + modelName,
 		Extra:     string(extra),
 		CreatedAt: nowText,

@@ -53,6 +53,7 @@ export type AdminCreditLogListResponse = {
 
 export type AdminGenerationLog = {
     id: string;
+    taskId: string;
     userId: string;
     username: string;
     kind: "image" | "chat";

@@ -89,11 +89,11 @@ export default function ImagePage() {
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [taskStatus, setTaskStatus] = useState<ImageTaskStatus>({ running: null, waiting: [] });
+    const [taskStatus, setTaskStatus] = useState<ImageTaskStatus>({ running: null, waiting: [], recent: [] });
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
-    const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
+    const generationCount = Math.max(1, Math.min(3, Number(config.count) || 1));
 
     useEffect(() => {
         if (!running || !startedAt) return;
@@ -112,7 +112,7 @@ export default function ImagePage() {
                 const status = await fetchImageTaskStatus();
                 if (alive) setTaskStatus(status);
             } catch {
-                if (alive) setTaskStatus({ running: null, waiting: [] });
+                if (alive) setTaskStatus({ running: null, waiting: [], recent: [] });
             }
         };
         void refresh();
@@ -177,9 +177,7 @@ export default function ImagePage() {
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
 
-        const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
-
-        const result = await Promise.allSettled(tasks);
+        const result = await runGenerationBatch(snapshot);
         const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
         const successCount = successImages.length;
         const failCount = generationCount - successCount;
@@ -295,13 +293,41 @@ export default function ImagePage() {
             openConfigDialog(true);
             return null;
         }
-        return { text, config: { ...effectiveConfig, model, count: "1" }, references: [...references] };
+        return { text, config: { ...effectiveConfig, model, count: String(generationCount) }, references: [...references] };
+    };
+
+    const runGenerationBatch = async (snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
+        const itemStartedAt = performance.now();
+        const settled: PromiseSettledResult<GeneratedImage>[] = [];
+        try {
+            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, generationCount) : await requestGeneration(snapshot.config, snapshot.text, generationCount);
+            for (let index = 0; index < generationCount; index++) {
+                const image = result[index];
+                if (!image) {
+                    const reason = new Error("接口没有返回图片");
+                    setResults((value) => updateResultAt(value, index, { status: "failed", error: reason.message }));
+                    settled.push({ status: "rejected", reason });
+                    continue;
+                }
+                const meta = await readImageMeta(image.dataUrl);
+                const nextImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl) };
+                setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
+                settled.push({ status: "fulfilled", value: nextImage });
+            }
+        } catch (error) {
+            const messageText = error instanceof Error ? error.message : "生成失败";
+            for (let index = 0; index < generationCount; index++) {
+                setResults((value) => updateResultAt(value, index, { status: "failed", error: messageText }));
+                settled.push({ status: "rejected", reason: error });
+            }
+        }
+        return settled;
     };
 
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, 1) : await requestGeneration(snapshot.config, snapshot.text, 1);
             const image = result[0];
             if (!image) throw new Error("接口没有返回图片");
             const meta = await readImageMeta(image.dataUrl);
@@ -504,7 +530,7 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
                 <ModelPicker config={config} value={model} onChange={(value) => updateConfig("imageModel", value)} fullWidth onMissingConfig={() => openConfigDialog(false)} />
             </label>
             <div className="col-span-2">
-                <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" maxCount={10} />
+                <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" maxCount={3} />
             </div>
         </>
     );
@@ -517,14 +543,14 @@ function GlobalImageTaskPanel({ status }: { status: ImageTaskStatus }) {
             <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                     <div className="text-sm font-semibold">全站生图任务</div>
-                    <div className="text-xs text-stone-500 dark:text-stone-400">多人同时提交会自动排队，只显示用户与等待时间</div>
+                    <div className="text-xs text-stone-500 dark:text-stone-400">多人同时提交会自动排队，单次最多 3 张</div>
                 </div>
                 <Tag className="m-0">{hasTasks ? `${(status.running ? 1 : 0) + status.waiting.length} 个任务` : "空闲"}</Tag>
             </div>
             {status.running ? (
                 <div className="mb-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
                     <span className="font-medium">{status.running.username}</span>
-                    <span className="ml-2 text-stone-500 dark:text-stone-400">正在生图</span>
+                    <span className="ml-2 text-stone-500 dark:text-stone-400">正在生图{status.running.batchCount > 1 ? ` · ${status.running.batchCount} 张` : ""}</span>
                 </div>
             ) : null}
             {status.waiting.length ? (
@@ -532,7 +558,7 @@ function GlobalImageTaskPanel({ status }: { status: ImageTaskStatus }) {
                     {status.waiting.slice(0, 5).map((task, index) => (
                         <div key={task.id} className="flex items-center justify-between rounded-md border border-stone-200 bg-background px-3 py-2 text-sm dark:border-stone-800">
                             <span>
-                                {index + 1}. {task.username}
+                                {index + 1}. {task.username}{task.batchCount > 1 ? ` · ${task.batchCount} 张` : ""}
                             </span>
                             <span className="text-stone-500 dark:text-stone-400">预计等待 {formatDuration(task.estimatedWaitSeconds * 1000)}</span>
                         </div>
@@ -541,6 +567,7 @@ function GlobalImageTaskPanel({ status }: { status: ImageTaskStatus }) {
             ) : !status.running ? (
                 <div className="rounded-md border border-dashed border-stone-300 px-3 py-6 text-center text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">暂无排队任务</div>
             ) : null}
+            {status.recent?.length ? <div className="mt-3 text-xs text-stone-500 dark:text-stone-400">最近完成：{status.recent.slice(0, 3).map((task) => `${task.username} ${task.batchCount || 1}张 ${task.status}`).join("，")}</div> : null}
         </div>
     );
 }

@@ -50,11 +50,15 @@ func DeleteGenerationLog(id string) error { return repository.DeleteGenerationLo
 func DeleteGenerationLogs(ids []string) error { return repository.DeleteGenerationLogs(ids) }
 
 func BuildGenerationLog(userID string, path string, modelName string, requestBody []byte, responseBody []byte, status string, errMessage string) model.GenerationLog {
+	return BuildGenerationLogForTask("", userID, path, modelName, requestBody, responseBody, status, errMessage)
+}
+
+func BuildGenerationLogForTask(taskID string, userID string, path string, modelName string, requestBody []byte, responseBody []byte, status string, errMessage string) model.GenerationLog {
 	kind := model.GenerationLogKindChat
 	if strings.Contains(path, "/images/") {
 		kind = model.GenerationLogKindImage
 	}
-	return model.GenerationLog{ID: newID("gen"), UserID: userID, Kind: kind, Model: modelName, Path: path, Prompt: limitRunes(extractPrompt(requestBody), 4000), Images: extractImages(responseBody), Request: limitRunes(string(requestBody), 12000), Response: limitRunes(string(responseBody), 12000), Status: status, Error: limitRunes(errMessage, 4000), CreatedAt: now()}
+	return model.GenerationLog{ID: newID("gen"), TaskID: taskID, UserID: userID, Kind: kind, Model: modelName, Path: path, Prompt: limitRunes(extractPrompt(requestBody), 4000), Images: extractImages(responseBody), Request: limitRunes(string(requestBody), 12000), Response: limitRunes(string(responseBody), 12000), Status: status, Error: limitRunes(errMessage, 4000), CreatedAt: now()}
 }
 
 func extractPrompt(body []byte) string {

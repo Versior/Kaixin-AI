@@ -82,6 +82,15 @@ func AdminGenerationLogs(w http.ResponseWriter, r *http.Request) {
 	OK(w, result)
 }
 
+func AdminGenerationTasks(w http.ResponseWriter, r *http.Request) {
+	result, err := service.ListGenerationTasks(parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func AdminDeleteGenerationLog(w http.ResponseWriter, r *http.Request, id string) {
 	if err := service.DeleteGenerationLog(id); err != nil {
 		FailError(w, err)
