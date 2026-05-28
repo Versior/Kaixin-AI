@@ -3,12 +3,25 @@
 import { useEffect, useState } from "react";
 import { App, Button, Empty, Image, Input, Pagination, Spin, Tag, Typography } from "antd";
 import { Download, Search } from "lucide-react";
-import { saveAs } from "file-saver";
 
 import { fetchImageHistory, type ImageHistoryLog } from "@/services/api/image-history";
 
 function previewUrl(url: string) {
     return url.startsWith("http") ? `/api/image-proxy?thumb=1&url=${encodeURIComponent(url)}` : url;
+}
+
+function downloadUrl(url: string) {
+    return url.startsWith("http") ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url;
+}
+
+function downloadImage(url: string, filename: string) {
+    const link = document.createElement("a");
+    link.href = downloadUrl(url);
+    link.download = filename;
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 }
 
 function formatTime(value: string) {
@@ -97,7 +110,7 @@ export default function ImageHistoryPage() {
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                             {(log.images || []).map((url, index) => (
-                                                <Button key={`${log.id}-download-${index}`} size="small" icon={<Download className="size-3.5" />} onClick={() => saveAs(url, `history-${log.id}-${index + 1}.png`)}>
+                                                <Button key={`${log.id}-download-${index}`} size="small" icon={<Download className="size-3.5" />} onClick={() => downloadImage(url, `history-${log.id}-${index + 1}.png`)}>
                                                     下载{index + 1}
                                                 </Button>
                                             ))}

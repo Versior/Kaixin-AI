@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/basketikun/infinite-canvas/model"
@@ -69,13 +70,20 @@ func GenerationImageStats(todayPrefix string, rankLimit int) (GenerationImageSta
 	for _, rank := range rankByUser {
 		stats.UserRanks = append(stats.UserRanks, *rank)
 	}
-	for i := 0; i < len(stats.UserRanks); i++ {
-		for j := i + 1; j < len(stats.UserRanks); j++ {
-			if stats.UserRanks[j].Images > stats.UserRanks[i].Images || (stats.UserRanks[j].Images == stats.UserRanks[i].Images && stats.UserRanks[j].Tasks > stats.UserRanks[i].Tasks) {
-				stats.UserRanks[i], stats.UserRanks[j] = stats.UserRanks[j], stats.UserRanks[i]
-			}
+	sort.SliceStable(stats.UserRanks, func(i, j int) bool {
+		left := stats.UserRanks[i]
+		right := stats.UserRanks[j]
+		if left.Images != right.Images {
+			return left.Images > right.Images
 		}
-	}
+		if left.Tasks != right.Tasks {
+			return left.Tasks > right.Tasks
+		}
+		if left.Username != right.Username {
+			return left.Username < right.Username
+		}
+		return left.UserID < right.UserID
+	})
 	if len(stats.UserRanks) > rankLimit {
 		stats.UserRanks = stats.UserRanks[:rankLimit]
 	}

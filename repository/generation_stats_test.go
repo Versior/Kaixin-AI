@@ -45,3 +45,34 @@ func TestGenerationTaskStatsCountsImagesAndRanksUsers(t *testing.T) {
 		t.Fatalf("unexpected second rank: %+v", stats.UserRanks[1])
 	}
 }
+
+func TestGenerationImageStatsRanksTiesDeterministically(t *testing.T) {
+	setupCreditTestDB(t)
+	users := []model.User{
+		{ID: "user-b", Username: "bravo", AffCode: "aff-b"},
+		{ID: "user-a", Username: "alpha", AffCode: "aff-a"},
+	}
+	for _, user := range users {
+		if _, err := SaveUser(user); err != nil {
+			t.Fatalf("save user %s: %v", user.ID, err)
+		}
+	}
+	logs := []model.GenerationLog{
+		{ID: "b", UserID: "user-b", Kind: model.GenerationLogKindImage, Status: "success", Images: []string{"b"}, CreatedAt: "2026-05-28T01:00:00Z"},
+		{ID: "a", UserID: "user-a", Kind: model.GenerationLogKindImage, Status: "success", Images: []string{"a"}, CreatedAt: "2026-05-28T01:00:00Z"},
+	}
+	for _, log := range logs {
+		if _, err := SaveGenerationLog(log); err != nil {
+			t.Fatalf("save log %s: %v", log.ID, err)
+		}
+	}
+	for i := 0; i < 5; i++ {
+		stats, err := GenerationImageStats("2026-05-28", 10)
+		if err != nil {
+			t.Fatalf("stats: %v", err)
+		}
+		if len(stats.UserRanks) != 2 || stats.UserRanks[0].UserID != "user-a" || stats.UserRanks[1].UserID != "user-b" {
+			t.Fatalf("unexpected deterministic rank order: %+v", stats.UserRanks)
+		}
+	}
+}

@@ -340,8 +340,17 @@ func imageRequestLimitScope(r *http.Request) imageLimitScope {
 	return ""
 }
 
+func hasImageLimitScope(scopes []imageLimitScope, scope imageLimitScope) bool {
+	for _, item := range scopes {
+		if item == scope {
+			return true
+		}
+	}
+	return false
+}
+
 func allowImageBatchSubmission(user model.AuthUser, batchCount int, scopes ...imageLimitScope) bool {
-	if user.Role == model.UserRoleAdmin {
+	if user.Role == model.UserRoleAdmin || hasImageLimitScope(scopes, imageLimitScopeCanvas) {
 		return true
 	}
 	if batchCount < 1 {

@@ -19,6 +19,14 @@ type ImageApiResponse = {
     msg?: string;
 };
 
+type ParsedImage = {
+    id: string;
+    dataUrl: string;
+    width?: number;
+    height?: number;
+    bytes?: number;
+};
+
 const QUALITY_BASE: Record<string, number> = {
     low: 1024,
     medium: 2048,
@@ -70,14 +78,13 @@ function resolveRequestSize(quality: string | undefined, size: string) {
     return (quality && resolveSize(quality, value)) || value;
 }
 
-function resolveImageDataUrl(item: Record<string, unknown>) {
-    if (typeof item.b64_json === "string" && item.b64_json) {
-        return `data:image/png;base64,${item.b64_json}`;
-    }
-    if (typeof item.url === "string" && item.url) {
-        return item.url;
-    }
-    return null;
+function resolveImagePayloadItem(item: Record<string, unknown>): ParsedImage | null {
+    const dataUrl = typeof item.b64_json === "string" && item.b64_json ? `data:image/png;base64,${item.b64_json}` : typeof item.url === "string" && item.url ? item.url : null;
+    if (!dataUrl) return null;
+    const width = typeof item.width === "number" ? item.width : undefined;
+    const height = typeof item.height === "number" ? item.height : undefined;
+    const bytes = typeof item.bytes === "number" ? item.bytes : undefined;
+    return { id: nanoid(), dataUrl, width, height, bytes };
 }
 
 async function remoteImageToDataUrl(url: string) {
@@ -98,9 +105,8 @@ function parseImagePayload(payload: ImageApiResponse) {
     }
     const images =
         payload.data
-            ?.map(resolveImageDataUrl)
-            .filter((value): value is string => Boolean(value))
-            .map((dataUrl) => ({ id: nanoid(), dataUrl })) || [];
+            ?.map(resolveImagePayloadItem)
+            .filter((value): value is ParsedImage => Boolean(value)) || [];
 
     if (images.length === 0) {
         throw new Error("接口没有返回图片");

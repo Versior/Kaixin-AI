@@ -76,6 +76,14 @@ function normalizeWorkbenchImage(image: GeneratedImage): GeneratedImage {
     return { ...image, dataUrl: usableImageUrl(image.dataUrl) };
 }
 
+function displayDimensions(image: GeneratedImage) {
+    return image.width && image.height ? `${image.width}x${image.height}` : "尺寸读取中";
+}
+
+function displayDuration(image: GeneratedImage) {
+    return image.durationMs ? formatDuration(image.durationMs) : "已完成";
+}
+
 export default function ImagePage() {
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -224,7 +232,7 @@ export default function ImagePage() {
     };
 
     const downloadImage = (image: GeneratedImage, index: number) => {
-        saveAs(image.dataUrl, `image-${index + 1}.png`);
+        saveAs(usableImageUrl(image.dataUrl), `image-${index + 1}.png`);
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {
@@ -625,20 +633,18 @@ function ResultImageCard({
             <Image src={previewImageUrl(image.dataUrl)} alt={`生成结果 ${index + 1}`} className="aspect-square object-cover" preview={{ src: usableImageUrl(image.dataUrl) }} />
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-stone-200 px-3 py-2.5 dark:border-stone-800">
                 <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
-                    <span>
-                        {image.width}x{image.height}
-                    </span>
-                    <span>{formatBytes(image.bytes)}</span>
-                    <span>{formatDuration(image.durationMs)}</span>
+                    <span>{displayDimensions(image)}</span>
+                    {image.bytes ? <span>{formatBytes(image.bytes)}</span> : null}
+                    <span>{displayDuration(image)}</span>
                 </div>
-                <div className="flex shrink-0 gap-1">
-                    <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => void onSaveAsset(image, index)}>
-                        添加到素材
+                <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-1">
+                    <Button className="min-w-0" size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => void onSaveAsset(image, index)}>
+                        添加素材
                     </Button>
-                    <Button size="small" icon={<PenLine className="size-3.5" />} onClick={() => void onEdit(image, index)}>
-                        加入参考图
+                    <Button className="min-w-0" size="small" icon={<PenLine className="size-3.5" />} onClick={() => void onEdit(image, index)}>
+                        参考图
                     </Button>
-                    <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(image, index)}>
+                    <Button className="min-w-0" size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(image, index)}>
                         下载
                     </Button>
                 </div>
