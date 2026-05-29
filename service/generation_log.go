@@ -128,21 +128,65 @@ func ExtractImagesForAccounting(body []byte) []string {
 }
 
 func extractImages(body []byte) []string {
-	var payload struct {
-		Data []map[string]any `json:"data"`
-	}
+	var payload any
 	if json.Unmarshal(body, &payload) != nil {
 		return nil
 	}
+	seen := map[string]bool{}
 	images := []string{}
-	for _, item := range payload.Data {
-		if url, ok := item["url"].(string); ok && url != "" {
-			images = append(images, url)
-		} else if b64, ok := item["b64_json"].(string); ok && b64 != "" {
-			images = append(images, "data:image/png;base64,"+b64)
+	collectImages(payload, &images, seen)
+	return images
+}
+
+func collectImages(value any, images *[]string, seen map[string]bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, key := range []string{"url", "image_url", "image", "b64_json", "base64"} {
+			if image := normalizeExtractedImage(typed[key], key); image != "" && !seen[image] {
+				seen[image] = true
+				*images = append(*images, image)
+			}
+		}
+		for _, child := range typed {
+			collectImages(child, images, seen)
+		}
+	case []any:
+		for _, child := range typed {
+			collectImages(child, images, seen)
 		}
 	}
-	return images
+}
+
+func normalizeExtractedImage(value any, key string) string {
+	text, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	lower := strings.ToLower(text)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "data:image/") {
+		return text
+	}
+	if key == "b64_json" || key == "base64" || looksLikeBase64Image(text) {
+		return "data:image/png;base64," + text
+	}
+	return ""
+}
+
+func looksLikeBase64Image(value string) bool {
+	if len(value) < 4 || strings.ContainsAny(value, " \n\r	") {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '+' || r == '/' || r == '=' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func limitRunes(value string, max int) string {

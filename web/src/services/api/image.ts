@@ -70,14 +70,38 @@ function resolveRequestSize(quality: string | undefined, size: string) {
     return (quality && resolveSize(quality, value)) || value;
 }
 
-function resolveImageDataUrl(item: Record<string, unknown>) {
-    if (typeof item.b64_json === "string" && item.b64_json) {
-        return `data:image/png;base64,${item.b64_json}`;
-    }
-    if (typeof item.url === "string" && item.url) {
-        return item.url;
-    }
+const IMAGE_KEYS = ["url", "image_url", "image", "b64_json", "base64"];
+
+function normalizeImageValue(value: unknown, key: string) {
+    if (typeof value !== "string") return null;
+    const text = value.trim();
+    if (!text) return null;
+    const lower = text.toLowerCase();
+    if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("data:image/")) return text;
+    if (key === "b64_json" || key === "base64" || looksLikeBase64Image(text)) return `data:image/png;base64,${text}`;
     return null;
+}
+
+function looksLikeBase64Image(value: string) {
+    return value.length >= 4 && /^[A-Za-z0-9+/=]+$/.test(value);
+}
+
+function collectImageDataUrls(value: unknown, images: string[], seen: Set<string>) {
+    if (Array.isArray(value)) {
+        value.forEach((item) => collectImageDataUrls(item, images, seen));
+        return;
+    }
+    if (!value || typeof value !== "object") return;
+
+    const record = value as Record<string, unknown>;
+    IMAGE_KEYS.forEach((key) => {
+        const image = normalizeImageValue(record[key], key);
+        if (image && !seen.has(image)) {
+            seen.add(image);
+            images.push(image);
+        }
+    });
+    Object.values(record).forEach((item) => collectImageDataUrls(item, images, seen));
 }
 
 async function remoteImageToDataUrl(url: string) {
@@ -96,11 +120,9 @@ function parseImagePayload(payload: ImageApiResponse) {
     if (typeof payload.code === "number" && payload.code !== 0) {
         throw new Error(payload.msg || "请求失败");
     }
-    const images =
-        payload.data
-            ?.map(resolveImageDataUrl)
-            .filter((value): value is string => Boolean(value))
-            .map((dataUrl) => ({ id: nanoid(), dataUrl })) || [];
+    const dataUrls: string[] = [];
+    collectImageDataUrls(payload, dataUrls, new Set());
+    const images = dataUrls.map((dataUrl) => ({ id: nanoid(), dataUrl }));
 
     if (images.length === 0) {
         throw new Error("接口没有返回图片");

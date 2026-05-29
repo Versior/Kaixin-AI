@@ -38,6 +38,14 @@ func TestImageResponseUsageDetectsPartialSuccess(t *testing.T) {
 	}
 }
 
+func TestImageResponseUsageCountsNestedImagesAsSuccess(t *testing.T) {
+	payload := []byte(`{"output":[{"image_url":"https://example.com/a.png"},{"content":[{"base64":"BBBB"}]}]}`)
+	usage := analyzeImageResponseUsage("/images/edits", payload, 2, 3)
+	if usage.ActualImages != 2 || usage.Status != "success" || usage.Failed || usage.RefundCredits != 0 || usage.ChargedCredits != 6 {
+		t.Fatalf("nested image payload should be full success: %#v", usage)
+	}
+}
+
 func TestImageResponseUsageTreatsEmptySuccessAsFailure(t *testing.T) {
 	payload := []byte(`{"data":[]}`)
 	usage := analyzeImageResponseUsage("/images/generations", payload, 3, 3)
