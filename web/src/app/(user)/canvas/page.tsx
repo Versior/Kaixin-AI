@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
@@ -23,8 +23,13 @@ export default function CanvasPage() {
     const projects = useCanvasStore((state) => state.projects);
     const createProject = useCanvasStore((state) => state.createProject);
     const importProject = useCanvasStore((state) => state.importProject);
+    const hydrateCloudProjects = useCanvasStore((state) => state.hydrateCloudProjects);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
+
+    useEffect(() => {
+        if (hydrated) void hydrateCloudProjects().catch(() => message.warning("云端灵感加载失败，已显示本机缓存"));
+    }, [hydrateCloudProjects, hydrated, message]);
 
     const enterProject = (id: string) => {
         router.push(`/canvas/${id}`);

@@ -40,14 +40,13 @@ func TestImageSubmissionLimiterCountsBatchAsOneSubmission(t *testing.T) {
 	}
 }
 
-func TestImageSubmissionLimiterLimitsCanvasInspiration(t *testing.T) {
+func TestImageSubmissionLimiterAllowsCanvasInspiration(t *testing.T) {
 	resetImageSubmissionLimiterForTest()
 	user := model.AuthUser{ID: "guest", Role: model.UserRoleGuest}
-	if !allowImageBatchSubmission(user, 3, imageLimitScopeCanvas) {
-		t.Fatal("first canvas inspiration batch should be allowed")
-	}
-	if allowImageBatchSubmission(user, 1, imageLimitScopeCanvas) {
-		t.Fatal("canvas inspiration should follow the same three-image window")
+	for i := 0; i < 4; i++ {
+		if !allowImageBatchSubmission(user, 3, imageLimitScopeCanvas) {
+			t.Fatalf("canvas inspiration batch %d should bypass the user-side three-image window", i+1)
+		}
 	}
 }
 

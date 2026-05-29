@@ -8,6 +8,7 @@ import { readImageMeta } from "@/lib/image-utils";
 export type UploadedImage = {
     url: string;
     storageKey: string;
+    dataUrl?: string;
     width: number;
     height: number;
     bytes: number;
@@ -24,7 +25,8 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage> 
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = await readImageMeta(url);
-    return { url, storageKey, width: meta.width, height: meta.height, bytes: blob.size, mimeType: blob.type || meta.mimeType };
+    const dataUrl = typeof input === "string" && input.startsWith("data:") ? input : await blobToDataUrl(blob);
+    return { url, storageKey, dataUrl, width: meta.width, height: meta.height, bytes: blob.size, mimeType: blob.type || meta.mimeType };
 }
 
 export async function resolveImageUrl(storageKey?: string, fallback = "") {

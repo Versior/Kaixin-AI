@@ -344,6 +344,11 @@ func allowImageBatchSubmission(user model.AuthUser, batchCount int, scopes ...im
 	if user.Role == model.UserRoleAdmin {
 		return true
 	}
+	for _, scope := range scopes {
+		if scope == imageLimitScopeCanvas {
+			return true
+		}
+	}
 	if batchCount < 1 {
 		batchCount = 1
 	}

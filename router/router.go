@@ -40,6 +40,11 @@ func New() *gin.Engine {
 	})
 	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
 	api.GET("/assets", middleware.UserAuth, gin.WrapF(handler.Assets))
+	api.GET("/canvas/projects", middleware.UserAuth, gin.WrapF(handler.CanvasProjects))
+	api.POST("/canvas/projects", middleware.UserAuth, gin.WrapF(handler.SaveCanvasProject))
+	api.DELETE("/canvas/projects/:id", middleware.UserAuth, func(c *gin.Context) {
+		handler.DeleteCanvasProject(c.Writer, c.Request, c.Param("id"))
+	})
 	api.POST("/admin/login", gin.WrapF(handler.AdminLogin))
 
 	admin := api.Group("/admin", middleware.AdminAuth)
