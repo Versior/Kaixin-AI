@@ -8,6 +8,7 @@ import { saveAs } from "file-saver";
 import { fetchImageHistory, type ImageHistoryLog } from "@/services/api/image-history";
 
 function previewUrl(url: string) {
+    if (!url || !url.trim()) return "";
     return url.startsWith("http") ? `/api/image-proxy?thumb=1&url=${encodeURIComponent(url)}` : url;
 }
 
@@ -80,10 +81,10 @@ export default function ImageHistoryPage() {
                             {logs.map((log) => (
                                 <article key={log.id} className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900">
                                     <div className="grid grid-cols-3 gap-1 bg-stone-100 p-1 dark:bg-stone-950">
-                                        {(log.images || []).slice(0, 3).map((url, index) => (
-                                            <Image key={`${log.id}-${index}`} src={previewUrl(url)} alt={log.prompt || log.id} height={120} width="100%" style={{ objectFit: "cover", borderRadius: 14 }} preview={{ src: url }} fallback="" />
+                                        {(log.images || []).filter((url) => url && url.trim()).slice(0, 3).map((url, index) => (
+                                            <Image key={`${log.id}-${index}`} src={previewUrl(url)} alt={log.prompt || log.id} height={120} width="100%" style={{ objectFit: "cover", borderRadius: 14 }} preview={{ src: url.startsWith("http") ? url : undefined }} fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect fill='%23f5f5f4' width='120' height='120'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23a8a29e' font-size='12'%3E无预览%3C/text%3E%3C/svg%3E" />
                                         ))}
-                                        {!log.images?.length ? <div className="col-span-3 flex h-[120px] items-center justify-center text-sm text-stone-400">无图片预览</div> : null}
+                                        {!log.images?.filter((url) => url && url.trim()).length ? <div className="col-span-3 flex h-[120px] items-center justify-center text-sm text-stone-400">无图片预览</div> : null}
                                     </div>
                                     <div className="space-y-3 p-4">
                                         <div className="flex items-center justify-between gap-3">

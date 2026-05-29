@@ -43,7 +43,7 @@ func ListUserGenerationLogs(userID string, q model.Query) ([]model.GenerationLog
 		return nil, 0, err
 	}
 	q.Normalize()
-	tx := db.Model(&model.GenerationLog{}).Select("generation_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '-') AS username").Joins("LEFT JOIN users ON users.id = generation_logs.user_id").Where("generation_logs.user_id = ?", userID)
+	tx := db.Model(&model.GenerationLog{}).Select("generation_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '-') AS username").Joins("LEFT JOIN users ON users.id = generation_logs.user_id").Where("generation_logs.user_id = ? AND generation_logs.status NOT IN (?, ?, ?)", userID, "failed", "error", "cancelled")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
 		tx = tx.Where("kind LIKE ? OR model LIKE ? OR path LIKE ? OR prompt LIKE ? OR status LIKE ? OR error LIKE ?", like, like, like, like, like, like)

@@ -138,7 +138,12 @@ async function hydrateRemoteImageUrls(images: Array<{ id: string; dataUrl: strin
 function readAxiosError(error: unknown, fallback: string) {
     if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; code?: number }>(error)) {
         const responseData = error.response?.data;
-        return responseData?.msg || responseData?.error?.message || (error.response?.status ? `${fallback}：${error.response.status}` : fallback);
+        const upstreamMsg = responseData?.msg || responseData?.error?.message || "";
+        if (upstreamMsg) return upstreamMsg;
+        if (error.code === "ECONNABORTED") return "生成超时，请稍后重试";
+        if (error.code === "ERR_NETWORK") return "网络连接失败，请检查网络";
+        if (error.response?.status) return `${fallback}：${error.response.status}`;
+        return fallback;
     }
     return error instanceof Error ? error.message : fallback;
 }
@@ -197,6 +202,13 @@ export type ImageRequestOptions = {
     scope?: "canvas";
 };
 
+const REQUEST_TIMEOUT = 60000;
+const CANVAS_TIMEOUT = 120000;
+
+function requestTimeout(options: ImageRequestOptions) {
+    return options.scope === "canvas" ? CANVAS_TIMEOUT : REQUEST_TIMEOUT;
+}
+
 export async function requestGeneration(config: AiConfig, prompt: string, count = 1, options: ImageRequestOptions = {}) {
     const n = Math.max(1, Math.min(3, Math.floor(Number(count) || 1)));
     const quality = normalizeQuality(config.quality);
@@ -214,6 +226,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, count 
             },
             {
                 headers: aiHeaders(config, "application/json", options.scope),
+                timeout: requestTimeout(options),
             },
         );
         const images = await hydrateRemoteImageUrls(parseImagePayload(response.data));
@@ -243,7 +256,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     files.forEach((file) => formData.append("image", file));
 
     try {
-        const response = await axios.post<ImageApiResponse>(aiRequestUrl(config, "/images/edits"), formData, { headers: aiHeaders(config, undefined, options.scope) });
+        const response = await axios.post<ImageApiResponse>(aiRequestUrl(config, "/images/edits"), formData, { headers: aiHeaders(config, undefined, options.scope), timeout: requestTimeout(options) });
         const images = await hydrateRemoteImageUrls(parseImagePayload(response.data));
         refreshRemoteUser(config);
         return images;

@@ -2510,7 +2510,7 @@ function imageExtension(dataUrl: string) {
 }
 
 function imageMetadata(image: UploadedImage): CanvasNodeMetadata {
-    return { content: image.url, dataUrl: image.dataUrl, storageKey: image.storageKey, status: "success", naturalWidth: image.width, naturalHeight: image.height, bytes: image.bytes, mimeType: image.mimeType };
+    return { content: image.url, dataUrl: image.dataUrl || image.url, storageKey: image.storageKey, status: "success", naturalWidth: image.width, naturalHeight: image.height, bytes: image.bytes, mimeType: image.mimeType };
 }
 
 function videoMetadata(video: UploadedFile): CanvasNodeMetadata {
@@ -2550,16 +2550,23 @@ async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
             const content = node.metadata?.content;
             if (node.type === CanvasNodeType.Video && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveMediaUrl(node.metadata.storageKey, content) } };
             if (node.type !== CanvasNodeType.Image || !content) return node;
-            if (node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveImageUrl(node.metadata.storageKey, content) } };
-            if (!content.startsWith("data:image/")) return node;
-            return { ...node, metadata: { ...node.metadata, ...imageMetadata(await uploadImage(content)) } };
+            if (node.metadata?.storageKey) {
+                const resolved = await resolveImageUrl(node.metadata.storageKey, "");
+                if (resolved) return { ...node, metadata: { ...node.metadata, content: resolved } };
+            }
+            if (node.metadata?.dataUrl?.startsWith("data:image/")) return { ...node, metadata: { ...node.metadata, content: node.metadata.dataUrl } };
+            if (typeof content === "string" && content.startsWith("data:image/")) return { ...node, metadata: { ...node.metadata, ...imageMetadata(await uploadImage(content)) } };
+            return node;
         }),
     );
 }
 
 async function hydrateAssistantImages(sessions: CanvasAssistantSession[]) {
     const hydrateItem = async <T extends { dataUrl?: string; storageKey?: string }>(item: T) => {
-        if (item.storageKey) return { ...item, dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl) };
+        if (item.storageKey) {
+            const resolved = await resolveImageUrl(item.storageKey, "");
+            if (resolved) return { ...item, dataUrl: resolved };
+        }
         if (item.dataUrl?.startsWith("data:image/")) {
             const image = await uploadImage(item.dataUrl);
             return { ...item, dataUrl: image.url, storageKey: image.storageKey };
