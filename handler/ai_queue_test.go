@@ -159,7 +159,7 @@ func TestImageTaskQueueRunsOneAtATimeAndReportsWait(t *testing.T) {
 	}
 	time.Sleep(20 * time.Millisecond)
 	status := queue.Status()
-	if status.Running == nil || status.Running.Username != "张三丰真" || len(status.Waiting) != 1 || status.Waiting[0].ID != secondID || status.Waiting[0].Username != "李四秘密" || status.Waiting[0].EstimatedWaitSeconds <= 0 {
+	if status.Running == nil || status.Running.Username != "" || len(status.Waiting) != 1 || status.Waiting[0].ID != secondID || status.Waiting[0].Username != "" || status.Waiting[0].EstimatedWaitSeconds <= 0 {
 		t.Fatalf("unexpected queued status: %#v", status)
 	}
 	select {
@@ -177,6 +177,49 @@ func TestImageTaskQueueRunsOneAtATimeAndReportsWait(t *testing.T) {
 	defer mu.Unlock()
 	if len(order) != 2 || order[0] != "first" || order[1] != "second" {
 		t.Fatalf("unexpected run order: %v", order)
+	}
+}
+
+func TestImageTaskQueueStatusExposesAvatarOnly(t *testing.T) {
+	queue := newImageTaskQueueWithCapacity(2)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	firstID, err := queue.SubmitWithID(context.Background(), "task-running", "u1", "完整用户名一", "https://example.com/a.png", "gpt-image-2", 1, func(context.Context) imageTaskResult {
+		close(started)
+		<-release
+		return imageTaskResult{Status: "success"}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	secondID, err := queue.SubmitWithID(context.Background(), "task-waiting", "u2", "完整用户名二", "https://example.com/b.png", "gpt-image-2", 1, func(context.Context) imageTaskResult {
+		return imageTaskResult{Status: "success"}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := queue.Status()
+	if status.Running == nil || status.Running.ID != firstID || status.Running.Username != "" || status.Running.AvatarURL != "https://example.com/a.png" {
+		t.Fatalf("running task should expose avatar only, got %#v", status.Running)
+	}
+	if len(status.Waiting) != 1 || status.Waiting[0].ID != secondID || status.Waiting[0].Username != "" || status.Waiting[0].AvatarURL != "https://example.com/b.png" {
+		t.Fatalf("waiting task should expose avatar only, got %#v", status.Waiting)
+	}
+	close(release)
+	waitTaskStatus(t, queue, firstID, "success")
+	status = queue.Status()
+	foundRecent := false
+	for _, task := range status.Recent {
+		if task.ID == firstID && task.Username == "" && task.AvatarURL == "https://example.com/a.png" {
+			foundRecent = true
+		}
+		if task.Username != "" {
+			t.Fatalf("recent task should not expose username, got %#v", task)
+		}
+	}
+	if !foundRecent {
+		t.Fatalf("recent task should expose avatar only, got %#v", status.Recent)
 	}
 }
 

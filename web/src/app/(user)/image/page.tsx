@@ -2,7 +2,7 @@
 
 import { BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Typography } from "antd";
+import { App, Avatar, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Typography } from "antd";
 import localforage from "localforage";
 import { saveAs } from "file-saver";
 
@@ -553,17 +553,19 @@ function GlobalImageTaskPanel({ status, stats }: { status: ImageTaskStatus; stat
                 <Tag className="m-0">{hasTasks ? `${(status.running ? 1 : 0) + status.waiting.length} 个任务` : "空闲"}</Tag>
             </div>
             {status.running ? (
-                <div className="mb-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
-                    <span className="font-medium">{status.running.username}</span>
-                    <span className="ml-2 text-stone-500 dark:text-stone-400">正在生图{status.running.batchCount > 1 ? ` · ${status.running.batchCount} 张` : ""}</span>
+                <div className="mb-2 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <TaskAvatar task={status.running} />
+                    <span className="text-stone-600 dark:text-stone-300">正在生图{status.running.batchCount > 1 ? ` · ${status.running.batchCount} 张` : ""}</span>
                 </div>
             ) : null}
             {status.waiting.length ? (
                 <div className="space-y-2">
                     {status.waiting.slice(0, 5).map((task, index) => (
                         <div key={task.id} className="flex items-center justify-between rounded-md border border-stone-200 bg-background px-3 py-2 text-sm dark:border-stone-800">
-                            <span>
-                                {index + 1}. {task.username}{task.batchCount > 1 ? ` · ${task.batchCount} 张` : ""}
+                            <span className="flex items-center gap-2">
+                                <span className="text-stone-500">#{index + 1}</span>
+                                <TaskAvatar task={task} />
+                                {task.batchCount > 1 ? <span className="text-stone-500 dark:text-stone-400">{task.batchCount} 张</span> : null}
                             </span>
                             <span className="text-stone-500 dark:text-stone-400">预计等待 {formatDuration(task.estimatedWaitSeconds * 1000)}</span>
                         </div>
@@ -572,7 +574,17 @@ function GlobalImageTaskPanel({ status, stats }: { status: ImageTaskStatus; stat
             ) : !status.running ? (
                 <div className="rounded-md border border-dashed border-stone-300 px-3 py-6 text-center text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">暂无排队任务</div>
             ) : null}
-            {status.recent?.length ? <div className="mt-3 text-xs text-stone-500 dark:text-stone-400">最近完成：{status.recent.slice(0, 3).map((task) => `${task.username} ${task.batchCount || 1}张 ${task.status}`).join("，")}</div> : null}
+            {status.recent?.length ? (
+                <div className="mt-3 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                    <span>最近完成：</span>
+                    {status.recent.slice(0, 3).map((task) => (
+                        <span key={task.id} className="inline-flex items-center gap-1">
+                            <TaskAvatar task={task} size={18} />
+                            <span>{task.batchCount || 1}张 {task.status}</span>
+                        </span>
+                    ))}
+                </div>
+            ) : null}
             <div className="mt-4 border-t border-stone-200 pt-4 dark:border-stone-800">
                 <div className="mb-3 text-sm font-semibold">全站统计排行</div>
                 <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
@@ -592,6 +604,11 @@ function GlobalImageTaskPanel({ status, stats }: { status: ImageTaskStatus; stat
             </div>
         </div>
     );
+}
+
+function TaskAvatar({ task, size = 24 }: { task: { avatarUrl?: string; userId?: string }; size?: number }) {
+    const fallback = (task.userId?.trim()?.[0] || "U").toUpperCase();
+    return <Avatar size={size} src={task.avatarUrl ? <img src={task.avatarUrl} alt="" referrerPolicy="no-referrer" /> : undefined}>{fallback}</Avatar>;
 }
 
 function StatTile({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {

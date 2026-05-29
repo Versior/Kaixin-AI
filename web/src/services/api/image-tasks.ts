@@ -4,7 +4,8 @@ import { useUserStore } from "@/stores/use-user-store";
 export type ImageTaskInfo = {
     id: string;
     userId: string;
-    username: string;
+    username?: string;
+    avatarUrl?: string;
     model: string;
     status: "running" | "waiting" | "success" | "failed" | "cancelled" | string;
     createdAt: string;

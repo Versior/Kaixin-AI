@@ -120,7 +120,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 			FailError(w, err)
 			return
 		}
-		taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayTaskUsername(user), modelName, batchCount, func(ctx context.Context) imageTaskResult {
+		taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayTaskUsername(user), user.AvatarURL, modelName, batchCount, func(ctx context.Context) imageTaskResult {
 			_ = service.MarkGenerationTaskRunning(task.ID)
 			status, responseBody, errMessage, failed := executeAIProxyRequest(ctx, user.ID, modelName, path, body, contentType, credits, task.ID, w)
 			logID := ""
@@ -409,7 +409,8 @@ type imageTaskResult struct {
 type imageTaskInfo struct {
 	ID                   string `json:"id"`
 	UserID               string `json:"userId"`
-	Username             string `json:"username"`
+	Username             string `json:"username,omitempty"`
+	AvatarURL            string `json:"avatarUrl,omitempty"`
 	Model                string `json:"model"`
 	Status               string `json:"status"`
 	CreatedAt            string `json:"createdAt"`
@@ -441,10 +442,10 @@ func newImageTaskQueueWithCapacity(capacity int) *imageTaskQueue {
 }
 
 func (q *imageTaskQueue) Submit(ctx context.Context, userID, username, modelName string, batchCount int, run func(context.Context) imageTaskResult) (string, error) {
-	return q.SubmitWithID(ctx, fmt.Sprintf("task_%d", time.Now().UnixNano()), userID, username, modelName, batchCount, run)
+	return q.SubmitWithID(ctx, fmt.Sprintf("task_%d", time.Now().UnixNano()), userID, username, "", modelName, batchCount, run)
 }
 
-func (q *imageTaskQueue) SubmitWithID(ctx context.Context, taskID, userID, username, modelName string, batchCount int, run func(context.Context) imageTaskResult) (string, error) {
+func (q *imageTaskQueue) SubmitWithID(ctx context.Context, taskID, userID, username, avatarURL, modelName string, batchCount int, run func(context.Context) imageTaskResult) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -454,7 +455,7 @@ func (q *imageTaskQueue) SubmitWithID(ctx context.Context, taskID, userID, usern
 	if strings.TrimSpace(taskID) == "" {
 		taskID = fmt.Sprintf("task_%d", time.Now().UnixNano())
 	}
-	task := imageTask{info: imageTaskInfo{ID: taskID, UserID: userID, Username: username, Model: modelName, Status: "waiting", CreatedAt: time.Now().UTC().Format(time.RFC3339), BatchCount: batchCount}, ctx: ctx, run: run, done: make(chan struct{})}
+	task := imageTask{info: imageTaskInfo{ID: taskID, UserID: userID, Username: username, AvatarURL: strings.TrimSpace(avatarURL), Model: modelName, Status: "waiting", CreatedAt: time.Now().UTC().Format(time.RFC3339), BatchCount: batchCount}, ctx: ctx, run: run, done: make(chan struct{})}
 	q.mu.Lock()
 	if q.running != nil || len(q.waiting) > 0 {
 		task.info.EstimatedWaitSeconds = (len(q.waiting) + 1) * 60
@@ -563,17 +564,17 @@ func (q *imageTaskQueue) Status() imageTaskStatus {
 	waiting := append([]imageTaskInfo{}, q.waiting...)
 	for i := range waiting {
 		waiting[i].EstimatedWaitSeconds = (i + 1) * 60
-		waiting[i].Username = maskRankingName(waiting[i].Username)
+		waiting[i].Username = ""
 	}
 	var running *imageTaskInfo
 	if q.running != nil {
 		value := *q.running
-		value.Username = maskRankingName(value.Username)
+		value.Username = ""
 		running = &value
 	}
 	recent := append([]imageTaskInfo{}, q.recent...)
 	for i := range recent {
-		recent[i].Username = maskRankingName(recent[i].Username)
+		recent[i].Username = ""
 	}
 	return imageTaskStatus{Running: running, Waiting: waiting, Recent: recent}
 }
