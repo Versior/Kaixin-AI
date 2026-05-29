@@ -11,9 +11,9 @@ import (
 	"github.com/basketikun/infinite-canvas/repository"
 )
 
-func TestImageStatsIsPublicForLoggedInUsers(t *testing.T) {
+func TestImageStatsMasksRankingUsernames(t *testing.T) {
 	setupHandlerStatsTestDB(t)
-	if _, err := repository.SaveUser(model.User{ID: "user-1", Username: "alice", AffCode: "aff-1"}); err != nil {
+	if _, err := repository.SaveUser(model.User{ID: "user-1", Username: "alice-secret", AffCode: "aff-1"}); err != nil {
 		t.Fatalf("save user: %v", err)
 	}
 	if _, err := repository.SaveGenerationLog(model.GenerationLog{ID: "log-1", UserID: "user-1", Kind: model.GenerationLogKindImage, Status: "success", Images: []string{"a", "b"}, CreatedAt: "2026-05-28T01:00:00Z"}); err != nil {
@@ -25,8 +25,12 @@ func TestImageStatsIsPublicForLoggedInUsers(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", res.Code, res.Body.String())
 	}
-	if body := res.Body.String(); !containsAll(body, "totalImages", "userRanks", "alice") {
+	body := res.Body.String()
+	if !containsAll(body, "totalImages", "userRanks", "alic") {
 		t.Fatalf("unexpected body: %s", body)
+	}
+	if strings.Contains(body, "alice-secret") {
+		t.Fatalf("ranking username was not masked: %s", body)
 	}
 }
 

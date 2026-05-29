@@ -593,7 +593,22 @@ func AIImageStats(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	for i := range result.UserRanks {
+		result.UserRanks[i].Username = maskRankingName(result.UserRanks[i].Username)
+	}
 	OK(w, result)
+}
+
+func maskRankingName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "-" {
+		return name
+	}
+	runes := []rune(name)
+	if len(runes) <= 4 {
+		return name
+	}
+	return string(runes[:4])
 }
 
 func AIImageHistory(w http.ResponseWriter, r *http.Request) {
