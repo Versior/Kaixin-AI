@@ -797,6 +797,17 @@ func (err *aiError) Error() string {
 	return err.message
 }
 
+// internalImageHostPrefixes is the list of internal address prefixes that should
+// be rewritten to the public base URL before sending image URLs to the frontend.
+// Covers docker0 gateway, loopback, and IPv6 loopback — all pointing to the
+// chatgpt2api container's /images/ path inside the same host.
+var internalImageHostPrefixes = []string{
+	"http://172.17.0.1:3000",
+	"http://127.0.0.1:3000",
+	"http://localhost:3000",
+	"http://[::1]:3000",
+}
+
 func rewritePublicImageURLs(payload []byte) []byte {
 	base := strings.TrimRight(os.Getenv("PUBLIC_IMAGE_BASE_URL"), "/")
 	if base == "" || len(payload) == 0 {
@@ -820,9 +831,12 @@ func rewritePublicImageURLs(payload []byte) []byte {
 		if !ok || urlValue == "" {
 			continue
 		}
-		if strings.HasPrefix(urlValue, "http://172.17.0.1:3000") {
-			obj["url"] = base + strings.TrimPrefix(urlValue, "http://172.17.0.1:3000")
-			changed = true
+		for _, prefix := range internalImageHostPrefixes {
+			if strings.HasPrefix(urlValue, prefix) {
+				obj["url"] = base + strings.TrimPrefix(urlValue, prefix)
+				changed = true
+				break
+			}
 		}
 	}
 	if !changed {

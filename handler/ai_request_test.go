@@ -57,3 +57,61 @@ func buildMultipartImageRequest(t *testing.T, fields map[string]string) ([]byte,
 	}
 	return buf.Bytes(), writer.FormDataContentType()
 }
+
+func TestRewritePublicImageURLsRewritesDocker0Address(t *testing.T) {
+	t.Setenv("PUBLIC_IMAGE_BASE_URL", "http://example.com:3000")
+	payload := []byte(`{"data":[{"url":"http://172.17.0.1:3000/images/2026/05/29/abc.png"}]}`)
+	result := rewritePublicImageURLs(payload)
+	expected := `{"data":[{"url":"http://example.com:3000/images/2026/05/29/abc.png"}]}`
+	if string(result) != expected {
+		t.Fatalf("expected %s, got %s", expected, string(result))
+	}
+}
+
+func TestRewritePublicImageURLsRewritesLoopbackAddress(t *testing.T) {
+	t.Setenv("PUBLIC_IMAGE_BASE_URL", "http://example.com:3000")
+	payload := []byte(`{"data":[{"url":"http://127.0.0.1:3000/images/2026/05/29/abc.png"}]}`)
+	result := rewritePublicImageURLs(payload)
+	expected := `{"data":[{"url":"http://example.com:3000/images/2026/05/29/abc.png"}]}`
+	if string(result) != expected {
+		t.Fatalf("expected %s, got %s", expected, string(result))
+	}
+}
+
+func TestRewritePublicImageURLsRewritesLocalhostAddress(t *testing.T) {
+	t.Setenv("PUBLIC_IMAGE_BASE_URL", "http://example.com:3000")
+	payload := []byte(`{"data":[{"url":"http://localhost:3000/images/2026/05/29/abc.png"}]}`)
+	result := rewritePublicImageURLs(payload)
+	expected := `{"data":[{"url":"http://example.com:3000/images/2026/05/29/abc.png"}]}`
+	if string(result) != expected {
+		t.Fatalf("expected %s, got %s", expected, string(result))
+	}
+}
+
+func TestRewritePublicImageURLsNoRewriteWhenEnvEmpty(t *testing.T) {
+	t.Setenv("PUBLIC_IMAGE_BASE_URL", "")
+	payload := []byte(`{"data":[{"url":"http://172.17.0.1:3000/images/abc.png"}]}`)
+	result := rewritePublicImageURLs(payload)
+	if string(result) != string(payload) {
+		t.Fatalf("expected no rewrite when PUBLIC_IMAGE_BASE_URL is empty, got %s", string(result))
+	}
+}
+
+func TestRewritePublicImageURLsNoRewriteForPublicURL(t *testing.T) {
+	t.Setenv("PUBLIC_IMAGE_BASE_URL", "http://example.com:3000")
+	payload := []byte(`{"data":[{"url":"http://example.com:3000/images/abc.png"}]}`)
+	result := rewritePublicImageURLs(payload)
+	if string(result) != string(payload) {
+		t.Fatalf("expected no rewrite for already-public URL, got %s", string(result))
+	}
+}
+
+func TestRewritePublicImageURLsHandlesMultipleImages(t *testing.T) {
+	t.Setenv("PUBLIC_IMAGE_BASE_URL", "http://example.com:3000")
+	payload := []byte(`{"data":[{"url":"http://172.17.0.1:3000/images/a.png"},{"url":"http://127.0.0.1:3000/images/b.png"}]}`)
+	result := rewritePublicImageURLs(payload)
+	expected := `{"data":[{"url":"http://example.com:3000/images/a.png"},{"url":"http://example.com:3000/images/b.png"}]}`
+	if string(result) != expected {
+		t.Fatalf("expected %s, got %s", expected, string(result))
+	}
+}

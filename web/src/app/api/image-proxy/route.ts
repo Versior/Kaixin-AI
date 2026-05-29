@@ -5,11 +5,24 @@ export const maxDuration = 300;
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
+// internalImageHosts maps internal/loopback hostnames to the docker0 gateway
+// address that the chatgpt2api container is reachable at from inside the
+// infinite-canvas container. When the frontend passes an image URL whose host
+// is one of these internal addresses, we rewrite it so the server-side fetch
+// can actually reach the image file.
+const internalImageHostRewrites: Record<string, string> = {
+	"183.87.136.115": "172.17.0.1",
+	"127.0.0.1":      "172.17.0.1",
+	"localhost":      "172.17.0.1",
+	"[::1]":          "172.17.0.1",
+};
+
 function rewriteInternalImageUrl(url: URL) {
-    if (url.hostname === "183.87.136.115" && url.port === "3000") {
-        url.hostname = "172.17.0.1";
-    }
-    return url;
+	const targetHost = internalImageHostRewrites[url.hostname];
+	if (targetHost && url.port === "3000") {
+		url.hostname = targetHost;
+	}
+	return url;
 }
 
 export async function GET(request: NextRequest) {

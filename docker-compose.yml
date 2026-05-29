@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/versior/kaixin-ai:v0.1.0-kaixin.15
+    image: ghcr.io/versior/kaixin-ai:v0.1.0-kaixin.40
     container_name: infinite-canvas
     env_file:
       - .env
@@ -10,5 +10,4 @@ services:
       - ./data:/app/data
     ports:
       - "22380:3000"
-      - "22381:8080"
     restart: unless-stopped
