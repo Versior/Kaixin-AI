@@ -131,7 +131,7 @@ func TestImageTaskQueueRunsOneAtATimeAndReportsWait(t *testing.T) {
 	releaseFirst := make(chan struct{})
 	var mu sync.Mutex
 	order := []string{}
-	firstID, err := queue.Submit(context.Background(), "u1", "张三", "gpt-image-2", 1, func(context.Context) imageTaskResult {
+	firstID, err := queue.Submit(context.Background(), "u1", "张三丰真实账号", "gpt-image-2", 1, func(context.Context) imageTaskResult {
 		mu.Lock()
 		order = append(order, "first")
 		mu.Unlock()
@@ -147,7 +147,7 @@ func TestImageTaskQueueRunsOneAtATimeAndReportsWait(t *testing.T) {
 		t.Fatalf("expected one running task, got %#v", status)
 	}
 	secondDone := make(chan struct{})
-	secondID, err := queue.Submit(context.Background(), "u2", "李四", "gpt-image-2", 1, func(context.Context) imageTaskResult {
+	secondID, err := queue.Submit(context.Background(), "u2", "李四秘密用户", "gpt-image-2", 1, func(context.Context) imageTaskResult {
 		mu.Lock()
 		order = append(order, "second")
 		mu.Unlock()
@@ -159,7 +159,7 @@ func TestImageTaskQueueRunsOneAtATimeAndReportsWait(t *testing.T) {
 	}
 	time.Sleep(20 * time.Millisecond)
 	status := queue.Status()
-	if status.Running == nil || status.Running.Username != "张三" || len(status.Waiting) != 1 || status.Waiting[0].ID != secondID || status.Waiting[0].Username != "李四" || status.Waiting[0].EstimatedWaitSeconds <= 0 {
+	if status.Running == nil || status.Running.Username != "张三丰真" || len(status.Waiting) != 1 || status.Waiting[0].ID != secondID || status.Waiting[0].Username != "李四秘密" || status.Waiting[0].EstimatedWaitSeconds <= 0 {
 		t.Fatalf("unexpected queued status: %#v", status)
 	}
 	select {

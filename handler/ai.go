@@ -563,13 +563,18 @@ func (q *imageTaskQueue) Status() imageTaskStatus {
 	waiting := append([]imageTaskInfo{}, q.waiting...)
 	for i := range waiting {
 		waiting[i].EstimatedWaitSeconds = (i + 1) * 60
+		waiting[i].Username = maskRankingName(waiting[i].Username)
 	}
 	var running *imageTaskInfo
 	if q.running != nil {
 		value := *q.running
+		value.Username = maskRankingName(value.Username)
 		running = &value
 	}
 	recent := append([]imageTaskInfo{}, q.recent...)
+	for i := range recent {
+		recent[i].Username = maskRankingName(recent[i].Username)
+	}
 	return imageTaskStatus{Running: running, Waiting: waiting, Recent: recent}
 }
 
