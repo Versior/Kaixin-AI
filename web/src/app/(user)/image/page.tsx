@@ -596,7 +596,10 @@ function GlobalImageTaskPanel({ status, stats }: { status: ImageTaskStatus; stat
                 <div className="mt-3 space-y-2">
                     {stats.userRanks?.length ? stats.userRanks.slice(0, 8).map((item, index) => (
                         <div key={item.userId || index} className="flex items-center justify-between rounded-md border border-stone-200 bg-background px-3 py-2 text-sm dark:border-stone-800">
-                            <span><span className="mr-2 text-stone-500">#{index + 1}</span>{item.username || item.userId || "-"}</span>
+                            <span className="flex items-center gap-2">
+                                <span className="text-stone-500">#{index + 1}</span>
+                                <TaskAvatar task={item} />
+                            </span>
                             <span className="text-stone-500 dark:text-stone-400">{item.images} 张 · {item.tasks} 次</span>
                         </div>
                     )) : <div className="rounded-md border border-dashed border-stone-300 px-3 py-4 text-center text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">暂无排行</div>}

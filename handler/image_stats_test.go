@@ -11,9 +11,9 @@ import (
 	"github.com/basketikun/infinite-canvas/repository"
 )
 
-func TestImageStatsMasksRankingUsernames(t *testing.T) {
+func TestImageStatsExposesRankingAvatarsOnly(t *testing.T) {
 	setupHandlerStatsTestDB(t)
-	if _, err := repository.SaveUser(model.User{ID: "user-1", Username: "alice-secret", AffCode: "aff-1"}); err != nil {
+	if _, err := repository.SaveUser(model.User{ID: "user-1", Username: "alice-secret", AvatarURL: "https://example.com/alice.png", AffCode: "aff-1"}); err != nil {
 		t.Fatalf("save user: %v", err)
 	}
 	if _, err := repository.SaveGenerationLog(model.GenerationLog{ID: "log-1", UserID: "user-1", Kind: model.GenerationLogKindImage, Status: "success", Images: []string{"a", "b"}, CreatedAt: "2026-05-28T01:00:00Z"}); err != nil {
@@ -26,11 +26,11 @@ func TestImageStatsMasksRankingUsernames(t *testing.T) {
 		t.Fatalf("expected 200, got %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	if !containsAll(body, "totalImages", "userRanks", "alic") {
+	if !containsAll(body, "totalImages", "userRanks", "avatarUrl", "https://example.com/alice.png") {
 		t.Fatalf("unexpected body: %s", body)
 	}
-	if strings.Contains(body, "alice-secret") {
-		t.Fatalf("ranking username was not masked: %s", body)
+	if strings.Contains(body, "alice-secret") || strings.Contains(body, "\"username\"") || strings.Contains(body, "displayName") {
+		t.Fatalf("ranking exposed username instead of avatar only: %s", body)
 	}
 }
 

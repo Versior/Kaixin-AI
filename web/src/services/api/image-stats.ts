@@ -3,7 +3,8 @@ import { useUserStore } from "@/stores/use-user-store";
 
 export type ImageUserRank = {
     userId: string;
-    username: string;
+    username?: string;
+    avatarUrl?: string;
     tasks: number;
     images: number;
 };

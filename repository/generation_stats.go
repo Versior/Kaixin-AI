@@ -7,10 +7,11 @@ import (
 )
 
 type GenerationUserRank struct {
-	UserID   string `json:"userId"`
-	Username string `json:"username"`
-	Tasks    int    `json:"tasks"`
-	Images   int    `json:"images"`
+	UserID    string `json:"userId"`
+	Username  string `json:"username,omitempty"`
+	AvatarURL string `json:"avatarUrl,omitempty"`
+	Tasks     int    `json:"tasks"`
+	Images    int    `json:"images"`
 }
 
 type GenerationImageStatsResult struct {
@@ -29,8 +30,12 @@ func GenerationImageStats(todayPrefix string, rankLimit int) (GenerationImageSta
 	if rankLimit <= 0 {
 		rankLimit = 10
 	}
-	var logs []model.GenerationLog
-	if err := db.Model(&model.GenerationLog{}).Select("generation_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '-') AS username").Joins("LEFT JOIN users ON users.id = generation_logs.user_id").Where("generation_logs.kind = ?", model.GenerationLogKindImage).Find(&logs).Error; err != nil {
+	type logWithUser struct {
+		model.GenerationLog
+		AvatarURL string `gorm:"column:avatar_url"`
+	}
+	var logs []logWithUser
+	if err := db.Model(&model.GenerationLog{}).Select("generation_logs.*, COALESCE(NULLIF(users.display_name, ''), users.username, '-') AS username, users.avatar_url AS avatar_url").Joins("LEFT JOIN users ON users.id = generation_logs.user_id").Where("generation_logs.kind = ?", model.GenerationLogKindImage).Find(&logs).Error; err != nil {
 		return GenerationImageStatsResult{}, err
 	}
 	stats := GenerationImageStatsResult{UserRanks: []GenerationUserRank{}}
@@ -56,11 +61,14 @@ func GenerationImageStats(todayPrefix string, rankLimit int) (GenerationImageSta
 		}
 		rank := rankByUser[log.UserID]
 		if rank == nil {
-			rank = &GenerationUserRank{UserID: log.UserID, Username: log.Username}
+			rank = &GenerationUserRank{UserID: log.UserID, Username: log.Username, AvatarURL: strings.TrimSpace(log.AvatarURL)}
 			rankByUser[log.UserID] = rank
 		}
 		if rank.Username == "" || rank.Username == "-" {
 			rank.Username = log.Username
+		}
+		if rank.AvatarURL == "" {
+			rank.AvatarURL = strings.TrimSpace(log.AvatarURL)
 		}
 		rank.Tasks++
 		rank.Images += imageCount
