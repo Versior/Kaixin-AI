@@ -59,19 +59,21 @@ func SendVerificationCode(email string) error {
 	codeStoreMu.Unlock()
 
 	// 构建邮件
-	from := smtpCfg.From
-	if from == "" {
-		from = smtpCfg.Username
+	mailFrom := smtpCfg.From
+	if mailFrom == "" {
+		mailFrom = smtpCfg.Username
 	}
-	// 如果 From 只是邮箱地址（不含尖括号），加上显示名
-	if !strings.Contains(from, "<") {
-		from = fmt.Sprintf("灵感事务所 <%s>", from)
+	// SMTP 协议的 MAIL FROM 只认纯邮箱地址
+	// 消息头 From 可以用 "显示名 <邮箱>" 格式让邮件客户端显示友好名称
+	headerFrom := mailFrom
+	if !strings.Contains(headerFrom, "<") {
+		headerFrom = fmt.Sprintf("灵感事务所 <%s>", headerFrom)
 	}
 	subject := "【无限画布】注册验证码"
 	body := fmt.Sprintf("您的验证码是：%s\n\n有效期 5 分钟，请勿泄露给他人。", code)
 
 	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		from, email, subject, body))
+		headerFrom, email, subject, body))
 
 	// 发送
 	addr := fmt.Sprintf("%s:%d", smtpCfg.Host, smtpCfg.Port)
@@ -103,7 +105,7 @@ func SendVerificationCode(email string) error {
 				return safeMessageError{message: "SMTP 认证失败: " + err.Error()}
 			}
 		}
-		if err = c.Mail(from); err != nil {
+		if err = c.Mail(mailFrom); err != nil {
 			return err
 		}
 		if err = c.Rcpt(email); err != nil {
@@ -125,7 +127,7 @@ func SendVerificationCode(email string) error {
 	}
 
 	// 非 TLS（端口 587 / 25）
-	if err := smtp.SendMail(addr, auth, from, []string{email}, msg); err != nil {
+	if err := smtp.SendMail(addr, auth, mailFrom, []string{email}, msg); err != nil {
 		return safeMessageError{message: "邮件发送失败: " + err.Error()}
 	}
 	return nil
