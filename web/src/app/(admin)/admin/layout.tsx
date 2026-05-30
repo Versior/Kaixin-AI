@@ -5,7 +5,7 @@ import { Button, Flex, Layout, Menu, Typography, theme } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { adminLayoutStyle } from "@/lib/app-theme";
@@ -27,7 +27,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
+    const hydrateUser = useUserStore((state) => state.hydrateUser);
     const logout = useUserStore((state) => state.clearSession);
+    const [hydrated, setHydrated] = useState(false);
+
+    // 等待 Zustand persist 从 localStorage 恢复 token
+    useEffect(() => {
+        const unsub = useUserStore.persist.onFinishHydration(() => setHydrated(true));
+        if (useUserStore.persist.hasHydrated()) setHydrated(true);
+        return unsub;
+    }, []);
+
+    // persist 恢复后立即 hydrateUser（Admin 路由组没有 ClientRootInit）
+    useEffect(() => {
+        if (hydrated) void hydrateUser();
+    }, [hydrated, hydrateUser]);
     const activeKey = pathname.startsWith("/admin/settings")
         ? "/admin/settings"
         : pathname.startsWith("/admin/generation-logs")
@@ -54,10 +68,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         }
     }, [isReady, router, token, user?.role]);
 
-    if (!isReady || !token || user?.role !== "admin") {
+    // 等待 persist hydration + isReady，任一不满足都显示加载态
+    if (!hydrated || !isReady || !token || user?.role !== "admin") {
         return (
             <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: antToken.colorBgLayout }}>
-                <span />
+                <Flex vertical align="center" gap={16}>
+                    <div style={{ width: 40, height: 40, border: `3px solid ${antToken.colorBorder}`, borderTopColor: antToken.colorPrimary, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                    <Typography.Text type="secondary">加载中...</Typography.Text>
+                </Flex>
             </div>
         );
     }
