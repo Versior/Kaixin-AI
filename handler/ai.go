@@ -600,7 +600,7 @@ func AIImageStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range result.UserRanks {
-		result.UserRanks[i].Username = maskRankingName(result.UserRanks[i].Username)
+		result.UserRanks[i].Username = ""
 	}
 	OK(w, result)
 }
