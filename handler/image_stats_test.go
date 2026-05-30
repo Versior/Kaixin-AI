@@ -34,6 +34,26 @@ func TestImageStatsExposesRankingAvatarsOnly(t *testing.T) {
 	}
 }
 
+func TestImageStatsGeneratesFallbackAvatarWithoutUsername(t *testing.T) {
+	setupHandlerStatsTestDB(t)
+	if _, err := repository.SaveUser(model.User{ID: "user-2", Username: "心态", AffCode: "aff-2"}); err != nil {
+		t.Fatalf("save user: %v", err)
+	}
+	if _, err := repository.SaveGenerationLog(model.GenerationLog{ID: "log-2", UserID: "user-2", Kind: model.GenerationLogKindImage, Status: "success", Images: []string{"a"}, CreatedAt: "2026-05-28T01:00:00Z"}); err != nil {
+		t.Fatalf("save log: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/images/stats", nil)
+	res := httptest.NewRecorder()
+	AIImageStats(res, req)
+	body := res.Body.String()
+	if !strings.Contains(body, "data:image/svg+xml") {
+		t.Fatalf("expected generated avatar data uri, got %s", body)
+	}
+	if strings.Contains(body, "\"username\"") || strings.Contains(body, "心态") {
+		t.Fatalf("ranking exposed username: %s", body)
+	}
+}
+
 func setupHandlerStatsTestDB(t *testing.T) {
 	t.Helper()
 	config.Cfg.StorageDriver = "sqlite"

@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -120,7 +122,8 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 			FailError(w, err)
 			return
 		}
-		taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayTaskUsername(user), user.AvatarURL, modelName, batchCount, func(ctx context.Context) imageTaskResult {
+		displayName := displayTaskUsername(user)
+		taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayName, publicAvatarURL(displayName, user.AvatarURL, user.ID), modelName, batchCount, func(ctx context.Context) imageTaskResult {
 			_ = service.MarkGenerationTaskRunning(task.ID)
 			status, responseBody, errMessage, failed := executeAIProxyRequest(ctx, user.ID, modelName, path, body, contentType, credits, task.ID, w)
 			logID := ""
@@ -589,6 +592,38 @@ func displayTaskUsername(user model.AuthUser) string {
 	return "用户"
 }
 
+func publicAvatarURL(name string, avatarURL string, userID string) string {
+	avatarURL = strings.TrimSpace(avatarURL)
+	if avatarURL != "" {
+		return avatarURL
+	}
+	label := avatarLabel(name, userID)
+	colors := []string{"#f97316", "#ec4899", "#8b5cf6", "#06b6d4", "#22c55e", "#eab308", "#ef4444", "#6366f1"}
+	idx := 0
+	seed := label + userID
+	for _, r := range seed {
+		idx += int(r)
+	}
+	bg := colors[idx%len(colors)]
+	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="48" fill="%s"/><text x="50%%" y="54%%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="42" font-weight="700" fill="#fff">%s</text></svg>`, bg, html.EscapeString(label))
+	return "data:image/svg+xml," + url.QueryEscape(svg)
+}
+
+func avatarLabel(name string, userID string) string {
+	name = strings.TrimSpace(name)
+	if name != "" && name != "-" {
+		return string([]rune(name)[0])
+	}
+	userID = strings.TrimSpace(userID)
+	if strings.HasPrefix(userID, "user-") {
+		userID = strings.TrimPrefix(userID, "user-")
+	}
+	if userID != "" {
+		return strings.ToUpper(string([]rune(userID)[0]))
+	}
+	return "用"
+}
+
 func AIImageTasks(w http.ResponseWriter, r *http.Request) {
 	OK(w, globalImageTaskQueue.Status())
 }
@@ -600,6 +635,7 @@ func AIImageStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range result.UserRanks {
+		result.UserRanks[i].AvatarURL = publicAvatarURL(result.UserRanks[i].Username, result.UserRanks[i].AvatarURL, result.UserRanks[i].UserID)
 		result.UserRanks[i].Username = ""
 	}
 	OK(w, result)
