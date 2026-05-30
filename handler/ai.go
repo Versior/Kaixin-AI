@@ -110,30 +110,29 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	credits *= batchCount
 	if isImageAIPath(path) {
 		if !allowImageBatchSubmission(user, batchCount, imageRequestLimitScope(r)) {
-			if _, err := service.SaveGenerationLog(service.BuildGenerationLog(user.ID, path, modelName, body, []byte(`{"msg":"图片生成太频繁，请 3 分钟内最多生成 3 张"}`), "rate_limited", "图片生成太频繁，请 3 分钟内最多生成 3 张")); err != nil {
-				log.Printf("AI proxy save rate limit generation log failed: user=%s model=%s err=%v", user.ID, modelName, err)
-			}
 			Fail(w, "图片生成太频繁，请 3 分钟内最多生成 3 张")
 			return
 		}
-		kind := model.GenerationLogKindImage
-		task, err := service.CreateGenerationTask(user.ID, kind, modelName, path, batchCount, credits)
-		if err != nil {
-			FailError(w, err)
-			return
-		}
-		displayName := displayTaskUsername(user)
-		taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayName, publicAvatarURL(displayName, user.AvatarURL, user.ID), modelName, batchCount, func(ctx context.Context) imageTaskResult {
-			_ = service.MarkGenerationTaskRunning(task.ID)
-			status, responseBody, errMessage, failed := executeAIProxyRequest(ctx, user.ID, modelName, path, body, contentType, credits, task.ID, w)
-			logID := ""
+	kind := model.GenerationLogKindImage
+	task, err := service.CreateGenerationTask(user.ID, kind, modelName, path, batchCount, credits)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	displayName := displayTaskUsername(user)
+	taskID, err := globalImageTaskQueue.SubmitWithID(r.Context(), task.ID, user.ID, displayName, publicAvatarURL(displayName, user.AvatarURL, user.ID), modelName, batchCount, func(ctx context.Context) imageTaskResult {
+		_ = service.MarkGenerationTaskRunning(task.ID)
+		status, responseBody, errMessage, failed := executeAIProxyRequest(ctx, user.ID, modelName, path, body, contentType, credits, task.ID, w)
+		logID := ""
+		if !failed {
 			if saved, err := service.SaveGenerationLog(service.BuildGenerationLogForTask(task.ID, user.ID, path, modelName, body, responseBody, status, errMessage)); err != nil {
 				log.Printf("AI proxy save generation log failed: user=%s task=%s model=%s err=%v", user.ID, task.ID, modelName, err)
 			} else {
 				logID = saved.ID
 			}
-			_ = service.CompleteGenerationTask(task.ID, !failed, logID, errMessage)
-			return imageTaskResult{Status: status, Error: errMessage}
+		}
+		_ = service.CompleteGenerationTask(task.ID, !failed, logID, errMessage)
+		return imageTaskResult{Status: status, Error: errMessage}
 		})
 		if err != nil {
 			_ = service.CancelGenerationTask(task.ID, err.Error())
@@ -190,7 +189,7 @@ func executeAIProxyRequest(ctx context.Context, userID string, modelName string,
 			log.Printf("AI proxy refund credits failed: user=%s task=%s model=%s credits=%d err=%v", userID, taskID, modelName, refundCredits, err)
 		}
 	}
-	if taskID == "" {
+	if taskID == "" && !failed {
 		if _, err := service.SaveGenerationLog(service.BuildGenerationLog(userID, path, modelName, body, responseBody, status, errMessage)); err != nil {
 			log.Printf("AI proxy save generation log failed: user=%s model=%s err=%v", userID, modelName, err)
 		}
