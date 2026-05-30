@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { AxiosRequestHeaders } from "axios";
 
 export type ApiParams = Record<string, string | string[] | number | number[] | undefined>;
 
@@ -7,6 +8,30 @@ type ApiResponse<T> = {
     data: T;
     msg: string;
 };
+
+const AUTH_TOKEN_KEY = "infinite-canvas-auth-token-v1";
+
+/** 从 localStorage 读取持久化的登录 token */
+function getStoredToken(): string {
+    if (typeof window === "undefined") return "";
+    try {
+        const raw = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (!raw) return "";
+        const parsed = JSON.parse(raw);
+        return parsed?.state?.token || "";
+    } catch {
+        return "";
+    }
+}
+
+// 请求拦截器：自动带上登录 token
+axios.interceptors.request.use((config) => {
+    const token = getStoredToken();
+    if (token) {
+        (config.headers as AxiosRequestHeaders).set("Authorization", `Bearer ${token}`);
+    }
+    return config;
+});
 
 export function compactApiParams(params: ApiParams) {
     return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== "" && value !== undefined && (!Array.isArray(value) || value.length > 0))) as ApiParams;
