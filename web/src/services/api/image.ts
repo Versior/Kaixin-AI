@@ -202,7 +202,7 @@ export type ImageRequestOptions = {
     scope?: "canvas";
 };
 
-const REQUEST_TIMEOUT = 180000;
+const REQUEST_TIMEOUT = 300000;
 const CANVAS_TIMEOUT = 300000;
 
 function requestTimeout(options: ImageRequestOptions) {
