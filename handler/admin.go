@@ -2,8 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"html"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
@@ -98,6 +102,33 @@ func AdminGenerationStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		FailError(w, err)
 		return
+	}
+	for i := range result.UserRanks {
+		if strings.TrimSpace(result.UserRanks[i].AvatarURL) == "" {
+			name := strings.TrimSpace(result.UserRanks[i].Username)
+			userID := strings.TrimSpace(result.UserRanks[i].UserID)
+			// inline avatar label
+			label := ""
+			if name != "" && name != "-" {
+				label = string([]rune(name)[0])
+			} else {
+				uid := strings.TrimPrefix(userID, "user-")
+				if uid != "" {
+					label = strings.ToUpper(string([]rune(uid)[0]))
+				} else {
+					label = "用"
+				}
+			}
+			colors := []string{"#f97316", "#ec4899", "#8b5cf6", "#06b6d4", "#22c55e", "#eab308", "#ef4444", "#6366f1"}
+			idx := 0
+			for _, rv := range label + userID {
+				idx += int(rv)
+			}
+			bg := colors[idx%len(colors)]
+			svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="48" fill="%s"/><text x="50%%" y="54%%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="42" font-weight="700" fill="#fff">%s</text></svg>`, bg, html.EscapeString(label))
+			result.UserRanks[i].AvatarURL = "data:image/svg+xml," + strings.ReplaceAll(url.QueryEscape(svg), "+", "%20")
+		}
+		result.UserRanks[i].Username = ""
 	}
 	OK(w, result)
 }

@@ -16,8 +16,14 @@ type loginRequest struct {
 }
 
 type registerRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username         string `json:"username"`
+	Password         string `json:"password"`
+	Email            string `json:"email"`
+	VerificationCode string `json:"verificationCode"`
+}
+
+type sendCodeRequest struct {
+	Email string `json:"email"`
 }
 
 type saveUserRequest struct {
@@ -37,12 +43,22 @@ type adjustUserCreditsRequest struct {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	session, err := service.Register(request.Username, request.Password, clientIP(r))
+	session, err := service.Register(request.Username, request.Password, request.Email, request.VerificationCode, clientIP(r))
 	if err != nil {
 		FailError(w, err)
 		return
 	}
 	OK(w, session)
+}
+
+func SendVerificationCode(w http.ResponseWriter, r *http.Request) {
+	var request sendCodeRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.SendVerificationCode(request.Email); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {

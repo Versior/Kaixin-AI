@@ -240,6 +240,7 @@ export type AdminPublicSettings = {
     modelChannel: AdminPublicModelChannelSettings;
     auth: {
         allowRegister: boolean;
+        smtpEnabled: boolean;
         linuxDo: {
             enabled: boolean;
         };
@@ -263,6 +264,15 @@ export type AdminPrivateSettings = {
         linuxDo: {
             clientId: string;
             clientSecret: string;
+        };
+        smtp: {
+            enabled: boolean;
+            host: string;
+            port: number;
+            username: string;
+            password: string;
+            from: string;
+            useTls: boolean;
         };
     };
 };

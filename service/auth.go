@@ -37,12 +37,22 @@ func EnsureDefaultAdmin() error {
 		return nil
 	}
 	WarnDefaultSecurityConfig()
-	hasAdmin, err := repository.HasAdmin()
-	if err != nil || hasAdmin {
-		return err
-	}
 	hash, err := hashPassword(config.Cfg.AdminPassword)
 	if err != nil {
+		return err
+	}
+	existing, ok, err := repository.GetUserByUsername(config.Cfg.AdminUsername)
+	if err != nil {
+		return err
+	}
+	if ok && existing.Role == model.UserRoleAdmin {
+		existing.Password = hash
+		existing.UpdatedAt = now()
+		_, err := repository.SaveUser(existing)
+		return err
+	}
+	hasAdmin, err := repository.HasAdmin()
+	if err != nil || hasAdmin {
 		return err
 	}
 	_, err = repository.SaveUser(model.User{
@@ -58,7 +68,7 @@ func EnsureDefaultAdmin() error {
 	return err
 }
 
-func Register(username string, password string, registerIP string) (model.AuthSession, error) {
+func Register(username string, password string, email string, verificationCode string, registerIP string) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, err
@@ -68,7 +78,7 @@ func Register(username string, password string, registerIP string) (model.AuthSe
 		return model.AuthSession{}, safeMessageError{message: "当前未开放注册"}
 	}
 	username = strings.TrimSpace(username)
-	if strings.ContainsAny(username, " \t\r\n") {
+	if strings.ContainsAny(username, " 	\r\n") {
 		return model.AuthSession{}, safeMessageError{message: "用户名不能包含空格"}
 	}
 	if username == "" || password == "" {
@@ -79,6 +89,28 @@ func Register(username string, password string, registerIP string) (model.AuthSe
 			return model.AuthSession{}, err
 		}
 		return model.AuthSession{}, safeMessageError{message: "用户名已存在"}
+	}
+
+	// 如果 SMTP 已启用，才需校验邮箱和验证码
+	smtpEnabled := normalizedSettings.Private.Auth.SMTP.Enabled != nil && *normalizedSettings.Private.Auth.SMTP.Enabled
+	if smtpEnabled {
+		email = strings.TrimSpace(strings.ToLower(email))
+		if email == "" {
+			return model.AuthSession{}, safeMessageError{message: "邮箱不能为空"}
+		}
+		if verificationCode == "" {
+			return model.AuthSession{}, safeMessageError{message: "请输入验证码"}
+		}
+		// 验证邮箱验证码
+		if err := VerifyCode(email, verificationCode); err != nil {
+			return model.AuthSession{}, err
+		}
+		if _, ok, err := repository.GetUserByEmail(email); err != nil || ok {
+			if err != nil {
+				return model.AuthSession{}, err
+			}
+			return model.AuthSession{}, safeMessageError{message: "该邮箱已注册"}
+		}
 	}
 	registerIP = strings.TrimSpace(registerIP)
 	if _, ok, err := repository.GetUserByRegisterIP(registerIP); err != nil || ok {
@@ -94,6 +126,7 @@ func Register(username string, password string, registerIP string) (model.AuthSe
 	user, saved, err := repository.SaveRegisteredUserIfIPAvailable(model.User{
 		ID:         newID("user"),
 		Username:   username,
+		Email:      email,
 		Password:   hash,
 		Role:       model.UserRoleUser,
 		Credits:    200,

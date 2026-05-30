@@ -11,7 +11,8 @@ RUN bun run build
 
 # 构建 Go 后端入口。
 FROM golang:1.25-alpine AS api-build
-ENV GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=https://goproxy.io,direct
+RUN apk add --no-cache git
 
 WORKDIR /app
 COPY go.mod go.sum ./

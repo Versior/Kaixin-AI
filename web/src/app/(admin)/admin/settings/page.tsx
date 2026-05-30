@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircleOutlined, DeleteOutlined, FormatPainterOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, DeleteOutlined, FormatPainterOutlined, LoadingOutlined, MailOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
 import { App, Button, Card, Checkbox, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
 import dynamic from "next/dynamic";
@@ -39,7 +39,7 @@ const emptySettings: AdminSettings = {
         auth: { allowRegister: true, linuxDo: { enabled: false } },
         announcement: { enabled: false, title: "网站公告", content: "", version: "default", oncePerVersion: true },
     },
-    private: { channels: [], promptSync: { enabled: true, cron: "*/5 * * * *" }, auth: { linuxDo: { clientId: "", clientSecret: "" } } },
+    private: { channels: [], promptSync: { enabled: true, cron: "*/5 * * * *" }, auth: { linuxDo: { clientId: "", clientSecret: "" }, smtp: { enabled: false, host: "", port: 587, username: "", password: "", from: "", useTls: false } } },
 };
 const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", baseUrl: "", apiKey: "", models: [], weight: 1, enabled: true, remark: "" };
 
@@ -562,6 +562,58 @@ export default function AdminSettingsPage() {
                                         </Row>
                                     </Flex>
                                 </Card>
+                                <Card
+                                    size="small"
+                                    title={
+                                        <Space>
+                                            <MailOutlined />
+                                            SMTP 邮件服务
+                                        </Space>
+                                    }
+                                >
+                                    <Flex vertical gap={14}>
+                                        <Typography.Text type="secondary">
+                                            配置 SMTP 服务器用于注册时发送邮箱验证码。支持 TLS（端口 465）和普通模式（端口 587/25）。
+                                        </Typography.Text>
+                                        <Row gutter={16}>
+                                            <Col xs={24} md={6}>
+                                                <Form.Item name={["private", "auth", "smtp", "enabled"]} label="开启 SMTP" valuePropName="checked">
+                                                    <Switch />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} md={9}>
+                                                <Form.Item name={["private", "auth", "smtp", "host"]} label="SMTP 服务器">
+                                                    <Input placeholder="smtp.example.com" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} md={9}>
+                                                <Form.Item name={["private", "auth", "smtp", "port"]} label="端口">
+                                                    <InputNumber className="!w-full" placeholder="587" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} md={8}>
+                                                <Form.Item name={["private", "auth", "smtp", "useTls"]} label="使用 TLS" valuePropName="checked">
+                                                    <Switch />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} md={8}>
+                                                <Form.Item name={["private", "auth", "smtp", "username"]} label="用户名">
+                                                    <Input placeholder="smtp 登录用户名" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} md={8}>
+                                                <Form.Item name={["private", "auth", "smtp", "password"]} label="密码">
+                                                    <Input.Password placeholder="留空则沿用已保存的密码" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} md={24}>
+                                                <Form.Item name={["private", "auth", "smtp", "from"]} label="发件人地址" extra="留空则使用用户名作为发件人">
+                                                    <Input placeholder="noreply@example.com" />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </Flex>
+                                </Card>
                                 <Card size="small" title="提示词定时同步">
                                     <Row gutter={16} align="middle">
                                         <Col xs={24} md={8}>
@@ -898,6 +950,15 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
             linuxDo: {
                 clientId: setting.auth?.linuxDo?.clientId || "",
                 clientSecret: setting.auth?.linuxDo?.clientSecret || "",
+            },
+            smtp: {
+                enabled: setting.auth?.smtp?.enabled || false,
+                host: setting.auth?.smtp?.host || "",
+                port: setting.auth?.smtp?.port || 587,
+                username: setting.auth?.smtp?.username || "",
+                password: setting.auth?.smtp?.password || "",
+                from: setting.auth?.smtp?.from || "",
+                useTls: setting.auth?.smtp?.useTls || false,
             },
         },
     };

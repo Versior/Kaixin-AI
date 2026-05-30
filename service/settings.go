@@ -16,7 +16,17 @@ import (
 
 func PublicSettings() (model.PublicSetting, error) {
 	settings, err := repository.GetSettings()
-	return normalizePublicSetting(settings.Public), err
+	if err != nil {
+		return model.PublicSetting{}, err
+	}
+	public := normalizePublicSetting(settings.Public)
+	// 暴露 SMTP 启用状态给前端
+	smtpEnabled := false
+	if settings.Private.Auth.SMTP.Enabled != nil {
+		smtpEnabled = *settings.Private.Auth.SMTP.Enabled
+	}
+	public.Auth.SMTPEnabled = &smtpEnabled
+	return public, nil
 }
 
 func AdminSettings() (model.Settings, error) {
@@ -120,6 +130,18 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 			setting.Channels[i].Weight = 1
 		}
 	}
+	// SMTP 默认值
+	if setting.Auth.SMTP.Enabled == nil {
+		disabled := false
+		setting.Auth.SMTP.Enabled = &disabled
+	}
+	if setting.Auth.SMTP.Port == 0 {
+		setting.Auth.SMTP.Port = 587
+	}
+	if setting.Auth.SMTP.UseTLS == nil {
+		useTLS := false
+		setting.Auth.SMTP.UseTLS = &useTLS
+	}
 	return setting
 }
 
@@ -128,6 +150,7 @@ func hidePrivateAPIKeys(settings model.Settings) model.Settings {
 		settings.Private.Channels[i].APIKey = ""
 	}
 	settings.Private.Auth.LinuxDo.ClientSecret = ""
+	settings.Private.Auth.SMTP.Password = ""
 	return settings
 }
 
@@ -145,6 +168,9 @@ func keepPrivateAPIKeys(settings *model.Settings, saved model.Settings) {
 func keepPrivateAuthSecrets(settings *model.Settings, saved model.Settings) {
 	if strings.TrimSpace(settings.Private.Auth.LinuxDo.ClientSecret) == "" {
 		settings.Private.Auth.LinuxDo.ClientSecret = saved.Private.Auth.LinuxDo.ClientSecret
+	}
+	if strings.TrimSpace(settings.Private.Auth.SMTP.Password) == "" {
+		settings.Private.Auth.SMTP.Password = saved.Private.Auth.SMTP.Password
 	}
 }
 

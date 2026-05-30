@@ -81,6 +81,19 @@ func GetUserByRegisterIP(ip string) (model.User, bool, error) {
 	return findUser(db, "register_ip = ?", ip)
 }
 
+// GetUserByEmail 根据邮箱查询用户。
+func GetUserByEmail(email string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" {
+		return model.User{}, false, nil
+	}
+	return findUser(db, "email = ?", email)
+}
+
 // SaveUser 保存用户信息。
 func SaveUser(user model.User) (model.User, error) {
 	db, err := DB()

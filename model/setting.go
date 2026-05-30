@@ -57,6 +57,7 @@ type PublicSetting struct {
 type PublicAuthSetting struct {
 	AllowRegister *bool                    `json:"allowRegister"`
 	LinuxDo       PublicLinuxDoAuthSetting `json:"linuxDo"`
+	SMTPEnabled   *bool                    `json:"smtpEnabled"`
 }
 
 type PublicLinuxDoAuthSetting struct {
@@ -78,6 +79,17 @@ type PromptSyncSetting struct {
 
 type PrivateAuthSetting struct {
 	LinuxDo PrivateLinuxDoAuthSetting `json:"linuxDo"`
+	SMTP    SMTPSetting               `json:"smtp"`
+}
+
+type SMTPSetting struct {
+	Enabled    *bool  `json:"enabled"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	From       string `json:"from"`
+	UseTLS     *bool  `json:"useTls"`
 }
 
 type PrivateLinuxDoAuthSetting struct {
