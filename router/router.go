@@ -39,7 +39,7 @@ func New() *gin.Engine {
 	v1.GET("/videos/:id/content", func(c *gin.Context) {
 		handler.AIVideoContent(c.Writer, c.Request, c.Param("id"))
 	})
-	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
+	api.GET("/prompts", middleware.UserAuth, gin.WrapF(handler.Prompts))
 	api.GET("/assets", middleware.UserAuth, gin.WrapF(handler.Assets))
 	api.GET("/canvas/projects", middleware.UserAuth, gin.WrapF(handler.CanvasProjects))
 	api.POST("/canvas/projects", middleware.UserAuth, gin.WrapF(handler.SaveCanvasProject))
