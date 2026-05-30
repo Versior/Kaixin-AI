@@ -608,7 +608,7 @@ func AIImageStats(w http.ResponseWriter, r *http.Request) {
 func maskRankingName(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" || name == "-" {
-		return name
+		return ""
 	}
 	runes := []rune(name)
 	if len(runes) <= 4 {

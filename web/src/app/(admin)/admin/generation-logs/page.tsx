@@ -10,7 +10,10 @@ import { useCopyText } from "@/hooks/use-copy-text";
 import type { AdminGenerationLog } from "@/services/api/admin";
 import { useAdminGenerationLogs } from "./use-admin-generation-logs";
 
-const statusText = (status: string) => status === "success" ? "成功" : status === "error" ? "失败" : status;
+const statusText = (status: string) => {
+    const map: Record<string, string> = { success: "成功", error: "失败", failed: "失败", cancelled: "已取消", rate_limited: "限流", partial_success: "部分成功" };
+    return map[status] || status;
+};
 
 const typeOptions = [{ label: "全部类型", value: "" }, { label: "图片", value: "image" }, { label: "对话", value: "chat" }];
 

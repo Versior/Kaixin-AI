@@ -7,6 +7,11 @@ import { saveAs } from "file-saver";
 
 import { fetchImageHistory, type ImageHistoryLog } from "@/services/api/image-history";
 
+const historyStatusText = (status: string) => {
+    const map: Record<string, string> = { success: "成功", succeeded: "成功", error: "失败", failed: "失败", cancelled: "已取消", rate_limited: "限流", partial_success: "部分成功" };
+    return map[status] || status;
+};
+
 function previewUrl(url: string) {
     if (!url || !url.trim()) return "";
     return url.startsWith("http") ? `/api/image-proxy?thumb=1&url=${encodeURIComponent(url)}` : url;
@@ -88,7 +93,7 @@ export default function ImageHistoryPage() {
                                     </div>
                                     <div className="space-y-3 p-4">
                                         <div className="flex items-center justify-between gap-3">
-                                            <Tag color={log.status === "success" || log.status === "succeeded" ? "green" : log.status === "partial_success" ? "orange" : "red"}>{log.status || "unknown"}</Tag>
+                                            <Tag color={log.status === "success" || log.status === "succeeded" ? "green" : log.status === "partial_success" ? "orange" : "red"}>{historyStatusText(log.status)}</Tag>
                                             <span className="text-xs text-stone-500">{formatTime(log.createdAt)}</span>
                                         </div>
                                         <Typography.Paragraph ellipsis={{ rows: 3 }} className="!mb-0 text-sm">{log.prompt || "无提示词"}</Typography.Paragraph>
