@@ -63,6 +63,10 @@ func SendVerificationCode(email string) error {
 	if from == "" {
 		from = smtpCfg.Username
 	}
+	// 如果 From 只是邮箱地址（不含尖括号），加上显示名
+	if !strings.Contains(from, "<") {
+		from = fmt.Sprintf("灵感事务所 <%s>", from)
+	}
 	subject := "【无限画布】注册验证码"
 	body := fmt.Sprintf("您的验证码是：%s\n\n有效期 5 分钟，请勿泄露给他人。", code)
 
