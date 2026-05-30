@@ -842,6 +842,8 @@ var internalImageHostPrefixes = []string{
 	"http://127.0.0.1:3000",
 	"http://localhost:3000",
 	"http://[::1]:3000",
+	"http://chatgpt2api:80",
+	"http://chatgpt2api",
 }
 
 func rewritePublicImageURLs(payload []byte) []byte {
