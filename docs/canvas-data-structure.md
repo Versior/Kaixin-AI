@@ -4,10 +4,10 @@
 
 ## 存储位置
 
-- 画布项目 JSON：`localForage`，数据库名 `infinite-canvas`，storeName `app_state`，key 为 `infinite-canvas:canvas_store`。
-- 我的素材 JSON：`localForage`，数据库名 `infinite-canvas`，storeName `app_state`，key 为 `infinite-canvas:asset_store`。
-- 图片 Blob：`localForage`，数据库名 `infinite-canvas`，storeName `image_files`。
-- 视频等媒体 Blob：`localForage`，数据库名 `infinite-canvas`，storeName `media_files`。
+- 画布项目 JSON：`localForage`，数据库名 `linggan-sws`，storeName `app_state`，key 为 `linggan-sws:canvas_store`。
+- 我的素材 JSON：`localForage`，数据库名 `linggan-sws`，storeName `app_state`，key 为 `linggan-sws:asset_store`。
+- 图片 Blob：`localForage`，数据库名 `linggan-sws`，storeName `image_files`。
+- 视频等媒体 Blob：`localForage`，数据库名 `linggan-sws`，storeName `media_files`。
 
 节点、助手会话和素材只保存展示 URL、`storageKey` 和元信息。真实文件通过 `storageKey` 读取。
 

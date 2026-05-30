@@ -69,7 +69,7 @@ func SendVerificationCode(email string) error {
 	if !strings.Contains(headerFrom, "<") {
 		headerFrom = fmt.Sprintf("灵感事务所 <%s>", headerFrom)
 	}
-	subject := "【无限画布】注册验证码"
+	subject := "【灵感事务所】注册验证码"
 	body := fmt.Sprintf("您的验证码是：%s\n\n有效期 5 分钟，请勿泄露给他人。", code)
 
 	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",

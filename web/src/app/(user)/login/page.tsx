@@ -132,7 +132,7 @@ function LoginContent() {
                         aria-label="灵感事务所"
                     />
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">账号登录</h1>
-                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">灵感无需等待，创作即刻发生。</p>
+                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">在这里，灵感生根发芽。</p>
                 </div>
 
                 <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit}>

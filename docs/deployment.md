@@ -24,7 +24,7 @@ docker compose up -d --build
 线上建议挂载到宿主机目录，例如：
 
 ```bash
--v /root/infinite-canvas/data:/app/data
+-v /root/linggan-sws/data:/app/data
 ```
 
 SQLite 数据库、上传媒体、提示词缓存等都应放在持久化目录里。
@@ -85,7 +85,7 @@ curl -i http://服务器地址/admin
 
 ```bash
 docker ps
-docker logs --tail 120 infinite-canvas
+docker logs --tail 120 linggan-sws
 ```
 
 日志中不应出现 `panic`、`fatal` 或连续业务错误。

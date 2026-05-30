@@ -24,7 +24,7 @@ export type AiConfig = {
     count: string;
 };
 
-export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
+export const CONFIG_STORE_KEY = "linggan-sws:ai_config_store";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
@@ -109,6 +109,26 @@ export const useConfigStore = create<ConfigStore>()(
         }),
         {
             name: CONFIG_STORE_KEY,
+            storage: {
+                getItem: (name) => {
+                    try {
+                        const val = localStorage.getItem(name);
+                        if (val) return val;
+                        const oldVal = localStorage.getItem("infinite-canvas:ai_config_store");
+                        if (oldVal) {
+                            localStorage.setItem(name, oldVal); // migrate
+                            return oldVal;
+                        }
+                    } catch {}
+                    return null;
+                },
+                setItem: (name, value) => {
+                    try { localStorage.setItem(name, value); } catch {}
+                },
+                removeItem: (name) => {
+                    try { localStorage.removeItem(name); } catch {}
+                },
+            },
             partialize: (state) => ({ config: state.config }),
             merge: (persisted, current) => {
                 const config = { ...defaultConfig, ...((persisted as Partial<ConfigStore>).config || {}) };
