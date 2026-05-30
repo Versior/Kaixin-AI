@@ -81,7 +81,14 @@ export function AppTopNav() {
                         </div>
 
                         <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
-                            {isReady && user ? (
+                            {!isReady ? (
+                                // auth 加载中：显示中性骨架，避免"登录"二字闪变头像
+                                <>
+                                    <div className="size-8 animate-pulse rounded bg-stone-200 dark:bg-stone-800" />
+                                    <div className="size-8 animate-pulse rounded bg-stone-200 dark:bg-stone-800" />
+                                    <div className="h-4 w-10 animate-pulse rounded bg-stone-200 dark:bg-stone-800" />
+                                </>
+                            ) : user ? (
                                 <UserStatusActions />
                             ) : (
                                 <>
