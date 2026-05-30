@@ -17,4 +17,7 @@ services:
       - /root/infinite-canvas/data:/app/data
     ports:
       - "22380:3000"
+    extra_hosts:
+      - "chatgpt2api:172.17.0.2"
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
