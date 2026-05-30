@@ -111,25 +111,13 @@ export default function ImagePage() {
         let alive = true;
         const refresh = async () => {
             try {
-                const [status, stats, cloudLogs] = await Promise.all([
+                const [status, stats] = await Promise.all([
                     fetchImageTaskStatus(),
                     fetchImageStats(),
-                    fetchCloudImageHistory().catch(() => null),
                 ]);
                 if (alive) {
                     setTaskStatus(status);
                     setImageStats(stats);
-                    if (cloudLogs) {
-                        const localLogs = await readStoredLogs();
-                        const localIds = new Set(localLogs.map((l) => l.id));
-                        const cloudLogItems = await Promise.all(
-                            (cloudLogs.items || [])
-                                .filter((item) => !localIds.has(`cloud-${item.id}`))
-                                .map(cloudLogToLocalAsync),
-                        );
-                        const merged = [...cloudLogItems, ...localLogs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                        setLogs(merged);
-                    }
                 }
             } catch {
                 if (alive) setTaskStatus({ running: null, waiting: [], recent: [] });
@@ -627,7 +615,7 @@ function GlobalImageTaskPanel({ status, stats }: { status: ImageTaskStatus; stat
 function TaskAvatar({ task, size = 24 }: { task: { avatarUrl?: string; userId?: string; username?: string }; size?: number }) {
     const name = task.username?.trim() || "";
     const fallback = (name && name !== "-" ? name[0] : task.userId?.trim()?.[0] || "U").toUpperCase();
-    return <Avatar size={size} src={task.avatarUrl ? <img src={task.avatarUrl} alt="" referrerPolicy="no-referrer" /> : undefined}>{fallback}</Avatar>;
+    return <Avatar size={size} src={task.avatarUrl || undefined}>{fallback}</Avatar>;
 }
 
 function StatTile({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
@@ -815,83 +803,6 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
             </div>
         </button>
     );
-}
-
-type CloudImageHistoryItem = {
-    id: string;
-    prompt: string;
-    images: string[];
-    model: string;
-    status: string;
-    createdAt: string;
-    error?: string;
-};
-
-type CloudImageHistoryResponse = {
-    items: CloudImageHistoryItem[];
-    total: number;
-};
-
-async function fetchCloudImageHistory(): Promise<CloudImageHistoryResponse> {
-    const { apiGet } = await import("@/services/api/request");
-    const { useUserStore } = await import("@/stores/use-user-store");
-    return apiGet<CloudImageHistoryResponse>("/api/v1/images/history", undefined, useUserStore.getState().token);
-}
-
-async function cloudLogToLocalAsync(item: CloudImageHistoryItem): Promise<GenerationLog> {
-    const imageUrls = (item.images || []).filter((url) => url && url.trim());
-    const proxyUrl = (url: string) => url.startsWith("http") ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url;
-    const images = await Promise.all(imageUrls.map(async (url, index) => {
-        let dataUrl = proxyUrl(url);
-        // 尝试下载远程图片转为 base64，避免 URL 过期导致裂图
-        if (url.startsWith("http")) {
-            try {
-                const response = await fetch(proxyUrl(url));
-                if (response.ok) {
-                    const blob = await response.blob();
-                    dataUrl = await new Promise<string>((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(String(reader.result));
-                        reader.onerror = () => reject(new Error("read error"));
-                        reader.readAsDataURL(blob);
-                    });
-                }
-            } catch {
-                    // 下载失败则保留 proxy URL
-            }
-        }
-        return {
-            id: `cloud-${item.id}-${index}`,
-            dataUrl,
-            storageKey: "",
-            durationMs: 0,
-            width: 0,
-            height: 0,
-            bytes: 0,
-            mimeType: "image/png",
-        };
-    }));
-    const createdAt = new Date(item.createdAt).getTime() || Date.now();
-    const prompt = item.prompt || "";
-    return {
-        id: `cloud-${item.id}`,
-        createdAt,
-        title: prompt.slice(0, 12) || "云端记录",
-        prompt,
-        time: new Date(createdAt).toLocaleString("zh-CN", { hour12: false }),
-        model: item.model || "",
-        config: { model: item.model || "", imageModel: item.model || "", quality: "", size: "", count: String(images.length || 1) },
-        references: [],
-        durationMs: 0,
-        successCount: images.length,
-        failCount: item.status === "error" || item.status === "failed" ? 1 : 0,
-        imageCount: images.length,
-        size: "",
-        quality: "",
-        status: (item.status === "error" || item.status === "failed") ? "失败" : "成功",
-        images,
-        thumbnails: images.map((img) => img.dataUrl),
-    };
 }
 
 async function readStoredLogs() {

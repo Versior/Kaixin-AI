@@ -606,7 +606,7 @@ func publicAvatarURL(name string, avatarURL string, userID string) string {
 	}
 	bg := colors[idx%len(colors)]
 	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="48" fill="%s"/><text x="50%%" y="54%%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="42" font-weight="700" fill="#fff">%s</text></svg>`, bg, html.EscapeString(label))
-	return "data:image/svg+xml," + url.QueryEscape(svg)
+	return "data:image/svg+xml," + strings.ReplaceAll(url.QueryEscape(svg), "+", "%20")
 }
 
 func avatarLabel(name string, userID string) string {
