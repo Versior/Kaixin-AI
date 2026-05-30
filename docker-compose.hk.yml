@@ -2,22 +2,22 @@ services:
   app:
     image: ghcr.io/versior/kaixin-ai:main
     container_name: infinite-canvas
+    env_file:
+      - .env
     environment:
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=xbb77657.
-      - PORT=8080
-      - STORAGE_DRIVER=sqlite
-      - DATABASE_DSN=data/infinite-canvas.db
-      - PUBLIC_IMAGE_BASE_URL=http://183.87.136.115:3000
-      - GIN_MODE=release
-      - JWT_SECRET=576df5c533937692207f73117a62a23344ca5febd60afc0721e6bb316c718af0
-      - JWT_EXPIRE_HOURS=168
-      - PROMPT_DATA_DIR=/app/data/prompts
+      # 以下为可选覆盖项，优先读取 .env 文件
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - PORT=${BACKEND_PORT:-8080}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-sqlite}
+      - DATABASE_DSN=${DATABASE_DSN:-data/infinite-canvas.db}
+      - PUBLIC_IMAGE_BASE_URL=${PUBLIC_IMAGE_BASE_URL:-http://localhost:3000}
+      - GIN_MODE=${GIN_MODE:-release}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRE_HOURS=${JWT_EXPIRE_HOURS:-168}
+      - PROMPT_DATA_DIR=${PROMPT_DATA_DIR:-/app/data/prompts}
     volumes:
-      - /root/infinite-canvas/data:/app/data
+      - ./data:/app/data
     ports:
-      - "22380:3000"
-    extra_hosts:
-      - "chatgpt2api:172.17.0.2"
-      - "host.docker.internal:host-gateway"
+      - "${FRONTEND_PORT:-3000}:3000"
     restart: unless-stopped

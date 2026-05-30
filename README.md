@@ -58,12 +58,14 @@ docker compose up -d
 
 访问：`http://localhost:3000`
 
-### 云端部署（华为云 / 香港节点参考）
+### 云端部署参考
 
 ```bash
-git clone https://github.com/Versior/Kaixin-AI.git /tmp/kaixin-github
-cd /tmp/kaixin-github
-docker compose -f docker-compose.hk.yml up -d
+git clone https://github.com/Versior/Kaixin-AI.git
+cd Kaixin-AI
+cp .env.example .env
+# 编辑 .env 设置你的公网域名和管理员密码
+docker compose up -d
 ```
 
 > 构建镜像请通过 GitHub Actions 完成，**禁止在服务器上本地构建**。
@@ -73,13 +75,14 @@ docker compose -f docker-compose.hk.yml up -d
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `ADMIN_USERNAME` | 管理员用户名 | `admin` |
-| `ADMIN_PASSWORD` | 管理员密码 | `admin` |
-| `JWT_SECRET` | JWT 签名密钥 | 随机生成 |
+| `ADMIN_PASSWORD` | 管理员密码（**必改**） | `changeme` |
+| `JWT_SECRET` | JWT 签名密钥（**必改**） | — |
 | `DATABASE_DSN` | 数据库路径 | `data/infinite-canvas.db` |
 | `PUBLIC_IMAGE_BASE_URL` | 图片公网访问地址 | `http://localhost:3000` |
 | `GIN_MODE` | Gin 运行模式 | `release` |
+| `FRONTEND_PORT` | 宿主机映射端口 | `3000` |
 
-部署到公网前**务必修改管理员密码**。
+部署到公网前**务必修改管理员密码和 JWT_SECRET**。
 
 ## 常用页面
 

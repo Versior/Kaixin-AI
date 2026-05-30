@@ -5,24 +5,38 @@ export const maxDuration = 300;
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
-// internalImageHosts maps internal/loopback hostnames to the docker0 gateway
-// address that the chatgpt2api container is reachable at from inside the
-// infinite-canvas container. When the frontend passes an image URL whose host
-// is one of these internal addresses, we rewrite it so the server-side fetch
-// can actually reach the image file.
-const internalImageHostRewrites: Record<string, string> = {
-	"183.87.136.115": "172.17.0.1",
-	"127.0.0.1":      "172.17.0.1",
-	"localhost":      "172.17.0.1",
-	"[::1]":          "172.17.0.1",
-};
+/**
+ * 内部图片地址重写映射。
+ * 当容器内需要访问宿主机上的 chatgpt2api 服务时，
+ * 将回环地址替换为 docker0 网关地址。
+ *
+ * 如果你的部署架构不同，请修改此映射或通过环境变量 INTERNAL_IMAGE_HOST_REWRITES 覆盖。
+ * 格式：JSON 对象，键为原始主机名，值为目标主机名。
+ * 例如：{"localhost":"host.docker.internal","127.0.0.1":"host.docker.internal"}
+ */
+function getInternalImageHostRewrites(): Record<string, string> {
+    const envOverride = process.env.INTERNAL_IMAGE_HOST_REWRITES;
+    if (envOverride) {
+        try {
+            return JSON.parse(envOverride);
+        } catch {
+            // ignore invalid JSON
+        }
+    }
+    return {
+        "127.0.0.1": "host.docker.internal",
+        "localhost": "host.docker.internal",
+        "[::1]": "host.docker.internal",
+    };
+}
 
 function rewriteInternalImageUrl(url: URL) {
-	const targetHost = internalImageHostRewrites[url.hostname];
-	if (targetHost && url.port === "3000") {
-		url.hostname = targetHost;
-	}
-	return url;
+    const rewrites = getInternalImageHostRewrites();
+    const targetHost = rewrites[url.hostname];
+    if (targetHost && url.port === "3000") {
+        url.hostname = targetHost;
+    }
+    return url;
 }
 
 export async function GET(request: NextRequest) {

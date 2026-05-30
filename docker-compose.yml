@@ -1,13 +1,13 @@
 services:
   app:
-    image: ghcr.io/versior/kaixin-ai:v0.1.0-kaixin.40
+    image: ghcr.io/versior/kaixin-ai:main
     container_name: infinite-canvas
     env_file:
       - .env
     environment:
-      - PUBLIC_IMAGE_BASE_URL=http://183.87.136.115:3000
+      - PUBLIC_IMAGE_BASE_URL=${PUBLIC_IMAGE_BASE_URL:-http://localhost:3000}
     volumes:
       - ./data:/app/data
     ports:
-      - "22380:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     restart: unless-stopped
