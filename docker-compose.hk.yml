@@ -1,11 +1,20 @@
 services:
   app:
-    image: infinite-canvas:patched-20260526
+    image: ghcr.io/versior/kaixin-ai:main
     container_name: infinite-canvas
-    env_file:
-      - .env
+    environment:
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=xbb77657.
+      - PORT=8080
+      - STORAGE_DRIVER=sqlite
+      - DATABASE_DSN=data/infinite-canvas.db
+      - PUBLIC_IMAGE_BASE_URL=http://183.87.136.115:3000
+      - GIN_MODE=release
+      - JWT_SECRET=576df5c533937692207f73117a62a23344ca5febd60afc0721e6bb316c718af0
+      - JWT_EXPIRE_HOURS=168
+      - PROMPT_DATA_DIR=/app/data/prompts
     volumes:
-      - ./data:/app/data
+      - /root/infinite-canvas/data:/app/data
     ports:
       - "22380:3000"
     restart: unless-stopped
